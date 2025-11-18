@@ -76,6 +76,11 @@ serve(async (req) => {
     const dealsData = await dealsResponse.json();
     console.log(`Fetched ${dealsData.results?.length || 0} deals for ${repName} (${team})`);
     
+    // Log deal details for debugging
+    if (dealsData.results && dealsData.results.length > 0) {
+      console.log('Sample deal properties:', JSON.stringify(dealsData.results[0].properties, null, 2));
+    }
+    
     const deals = dealsData.results?.map((d: any) => ({
       amount: parseFloat(d.properties.amount) || 0,
       closedate: d.properties.closedate,
@@ -85,6 +90,11 @@ serve(async (req) => {
       deal_channel: d.properties.deal_channel,
       payment_terms: d.properties.payment_terms,
     })) || [];
+    
+    console.log(`Team: ${team}, Rep ID: ${repId}, Deals found: ${deals.length}`);
+    if (team === 'SDR' && deals.length > 0) {
+      console.log('SDR owner values in deals:', deals.map((d: any) => d.sdr_owner));
+    }
 
     // Fetch meetings from HubSpot
     const meetingsResponse = await fetch(
