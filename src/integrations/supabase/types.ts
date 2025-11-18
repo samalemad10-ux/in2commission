@@ -60,34 +60,43 @@ export type Database = {
         Row: {
           ae_brackets: Json
           ae_payment_term_bonuses: Json
+          ae_revenue_multiplier_brackets: Json
           created_at: string
           id: string
           marketing_inbound_percent: number
+          marketing_revenue_multiplier_brackets: Json
           marketing_same_as_sdr: boolean
           sdr_closed_won_percent: number
           sdr_meeting_tiers: Json
+          sdr_revenue_multiplier_brackets: Json
           updated_at: string
         }
         Insert: {
           ae_brackets?: Json
           ae_payment_term_bonuses?: Json
+          ae_revenue_multiplier_brackets?: Json
           created_at?: string
           id?: string
           marketing_inbound_percent?: number
+          marketing_revenue_multiplier_brackets?: Json
           marketing_same_as_sdr?: boolean
           sdr_closed_won_percent?: number
           sdr_meeting_tiers?: Json
+          sdr_revenue_multiplier_brackets?: Json
           updated_at?: string
         }
         Update: {
           ae_brackets?: Json
           ae_payment_term_bonuses?: Json
+          ae_revenue_multiplier_brackets?: Json
           created_at?: string
           id?: string
           marketing_inbound_percent?: number
+          marketing_revenue_multiplier_brackets?: Json
           marketing_same_as_sdr?: boolean
           sdr_closed_won_percent?: number
           sdr_meeting_tiers?: Json
+          sdr_revenue_multiplier_brackets?: Json
           updated_at?: string
         }
         Relationships: []
