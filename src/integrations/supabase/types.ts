@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      commission_run_logs: {
+        Row: {
+          commission_json: Json
+          created_at: string
+          error_message: string | null
+          id: string
+          period_end: string
+          period_start: string
+          rep_id: string
+          rep_name: string
+          run_date: string
+          success: boolean
+          team: string
+        }
+        Insert: {
+          commission_json: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          period_end: string
+          period_start: string
+          rep_id: string
+          rep_name: string
+          run_date?: string
+          success?: boolean
+          team: string
+        }
+        Update: {
+          commission_json?: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          rep_id?: string
+          rep_name?: string
+          run_date?: string
+          success?: boolean
+          team?: string
+        }
+        Relationships: []
+      }
+      commission_settings: {
+        Row: {
+          ae_brackets: Json
+          ae_payment_term_bonuses: Json
+          created_at: string
+          id: string
+          marketing_inbound_percent: number
+          marketing_same_as_sdr: boolean
+          sdr_closed_won_percent: number
+          sdr_meeting_tiers: Json
+          updated_at: string
+        }
+        Insert: {
+          ae_brackets?: Json
+          ae_payment_term_bonuses?: Json
+          created_at?: string
+          id?: string
+          marketing_inbound_percent?: number
+          marketing_same_as_sdr?: boolean
+          sdr_closed_won_percent?: number
+          sdr_meeting_tiers?: Json
+          updated_at?: string
+        }
+        Update: {
+          ae_brackets?: Json
+          ae_payment_term_bonuses?: Json
+          created_at?: string
+          id?: string
+          marketing_inbound_percent?: number
+          marketing_same_as_sdr?: boolean
+          sdr_closed_won_percent?: number
+          sdr_meeting_tiers?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
