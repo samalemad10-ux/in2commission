@@ -23,12 +23,17 @@ export default function RunCommissions() {
   const [endDate, setEndDate] = useState<Date>(endOfMonth(subMonths(new Date(), 1)));
   const [results, setResults] = useState<any>(null);
 
-  // Mock HubSpot owners - in production, fetch from HubSpot
-  const hubspotOwners = [
-    { id: "001", name: "John Doe", team: "AE" },
-    { id: "002", name: "Jane Smith", team: "SDR" },
-    { id: "003", name: "Bob Johnson", team: "Marketing" },
-  ];
+  // Fetch real HubSpot owners
+  const { data: ownersData, isLoading: isLoadingOwners } = useQuery({
+    queryKey: ["hubspot-owners"],
+    queryFn: async () => {
+      const response = await supabase.functions.invoke("fetch-hubspot-owners");
+      if (response.error) throw response.error;
+      return response.data;
+    },
+  });
+
+  const hubspotOwners = ownersData?.owners || [];
 
   const calculateMutation = useMutation({
     mutationFn: async () => {
@@ -124,12 +129,13 @@ export default function RunCommissions() {
                     setRepTeam(owner.team);
                   }
                 }}
+                disabled={isLoadingOwners}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a rep" />
+                  <SelectValue placeholder={isLoadingOwners ? "Loading owners..." : "Select a rep"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {hubspotOwners.map((owner) => (
+                  {hubspotOwners.map((owner: any) => (
                     <SelectItem key={owner.id} value={owner.id}>
                       {owner.name} ({owner.team})
                     </SelectItem>
