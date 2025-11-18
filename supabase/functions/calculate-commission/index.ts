@@ -18,6 +18,24 @@ serve(async (req) => {
       throw new Error('HubSpot token not configured');
     }
 
+    // For SDR, fetch owner details from HubSpot to get email and name variations
+    let ownerEmail = '';
+    let ownerFullName = '';
+    if (team === 'SDR') {
+      const ownerResponse = await fetch(`https://api.hubapi.com/crm/v3/owners/${repId}`, {
+        headers: {
+          'Authorization': `Bearer ${hubspotToken}`,
+        },
+      });
+      
+      if (ownerResponse.ok) {
+        const ownerData = await ownerResponse.json();
+        ownerEmail = ownerData.email;
+        ownerFullName = `${ownerData.firstName} ${ownerData.lastName}`;
+        console.log(`Fetched SDR owner details: email=${ownerEmail}, fullName=${ownerFullName}`);
+      }
+    }
+
     // Fetch deals from HubSpot - different filter logic based on team
     let dealFilters: any[] = [
       {
@@ -87,15 +105,24 @@ serve(async (req) => {
     
     // For SDR, filter deals by sdr_owner property after fetching
     if (team === 'SDR') {
-      console.log(`Filtering SDR deals. Looking for sdr_owner matching: ${repId}`);
+      console.log(`Filtering SDR deals. Looking for sdr_owner matching: email=${ownerEmail}, fullName=${ownerFullName}, repName=${repName}, repId=${repId}`);
       console.log('SDR owner values before filter:', deals.map((d: any) => d.sdr_owner));
       
       deals = deals.filter((d: any) => {
-        // Try matching by ID or by name
-        const sdrOwnerMatch = d.sdr_owner === repId || 
-                             d.sdr_owner === repName ||
-                             d.sdr_owner?.toString() === repId?.toString();
-        return sdrOwnerMatch;
+        if (!d.sdr_owner) return false;
+        
+        const sdrOwnerLower = d.sdr_owner.toLowerCase();
+        // Try matching by email, full name, or repName
+        const emailMatch = ownerEmail && sdrOwnerLower === ownerEmail.toLowerCase();
+        const fullNameMatch = ownerFullName && sdrOwnerLower === ownerFullName.toLowerCase();
+        const repNameMatch = repName && sdrOwnerLower === repName.toLowerCase();
+        const idMatch = d.sdr_owner === repId || d.sdr_owner?.toString() === repId?.toString();
+        
+        const matches = emailMatch || fullNameMatch || repNameMatch || idMatch;
+        if (matches) {
+          console.log(`Match found! sdr_owner="${d.sdr_owner}" matched with ${emailMatch ? 'email' : fullNameMatch ? 'fullName' : repNameMatch ? 'repName' : 'id'}`);
+        }
+        return matches;
       });
       
       console.log(`After filtering: ${deals.length} deals for this SDR`);
