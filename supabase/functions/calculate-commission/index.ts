@@ -18,7 +18,44 @@ serve(async (req) => {
       throw new Error('HubSpot token not configured');
     }
 
-    // Fetch deals from HubSpot
+    // Fetch deals from HubSpot - different filter logic based on team
+    let dealFilters: any[] = [
+      {
+        propertyName: 'closedate',
+        operator: 'GTE',
+        value: new Date(startDate).getTime(),
+      },
+      {
+        propertyName: 'closedate',
+        operator: 'LTE',
+        value: new Date(endDate).getTime(),
+      },
+    ];
+
+    // Team-specific filtering
+    if (team === 'AE') {
+      // AE uses standard owner property
+      dealFilters.push({
+        propertyName: 'hubspot_owner_id',
+        operator: 'EQ',
+        value: repId,
+      });
+    } else if (team === 'SDR') {
+      // SDR uses the SDR OWNER property on deals
+      dealFilters.push({
+        propertyName: 'sdr_owner',
+        operator: 'EQ',
+        value: repId,
+      });
+    } else if (team === 'Marketing') {
+      // Marketing looks for Inbound channel deals
+      dealFilters.push({
+        propertyName: 'deal_channel',
+        operator: 'EQ',
+        value: 'Inbound',
+      });
+    }
+
     const dealsResponse = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
       method: 'POST',
       headers: {
@@ -28,36 +65,23 @@ serve(async (req) => {
       body: JSON.stringify({
         filterGroups: [
           {
-            filters: [
-              {
-                propertyName: 'hubspot_owner_id',
-                operator: 'EQ',
-                value: repId,
-              },
-              {
-                propertyName: 'closedate',
-                operator: 'GTE',
-                value: new Date(startDate).getTime(),
-              },
-              {
-                propertyName: 'closedate',
-                operator: 'LTE',
-                value: new Date(endDate).getTime(),
-              },
-            ],
+            filters: dealFilters,
           },
         ],
-        properties: ['amount', 'closedate', 'dealstage', 'deal_channel', 'payment_terms'],
+        properties: ['amount', 'closedate', 'dealstage', 'deal_channel', 'payment_terms', 'sdr_owner'],
         limit: 100,
       }),
     });
 
     const dealsData = await dealsResponse.json();
+    console.log(`Fetched ${dealsData.results?.length || 0} deals for ${repName} (${team})`);
+    
     const deals = dealsData.results?.map((d: any) => ({
       amount: parseFloat(d.properties.amount) || 0,
       closedate: d.properties.closedate,
       dealstage: d.properties.dealstage,
-      hubspot_owner_id: repId,
+      hubspot_owner_id: d.properties.hubspot_owner_id,
+      sdr_owner: d.properties.sdr_owner,
       deal_channel: d.properties.deal_channel,
       payment_terms: d.properties.payment_terms,
     })) || [];
