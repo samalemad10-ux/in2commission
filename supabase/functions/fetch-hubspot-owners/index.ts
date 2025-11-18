@@ -41,9 +41,8 @@ Deno.serve(async (req) => {
       id: owner.id,
       name: `${owner.firstName} ${owner.lastName}`,
       email: owner.email,
-      // You'll need to determine how to get team info from HubSpot
-      // For now, we'll leave it empty and it can be set manually or fetched from a custom property
-      team: owner.teams?.[0] || 'AE', // Default to AE if no team
+      // Extract team name from team object, or default to 'AE'
+      team: owner.teams?.[0]?.name || 'AE',
     }));
 
     return new Response(
