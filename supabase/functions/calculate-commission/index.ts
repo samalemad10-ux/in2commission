@@ -40,13 +40,6 @@ serve(async (req) => {
         operator: 'EQ',
         value: repId,
       });
-    } else if (team === 'SDR') {
-      // SDR uses the SDR OWNER property on deals
-      dealFilters.push({
-        propertyName: 'sdr_owner',
-        operator: 'EQ',
-        value: repId,
-      });
     } else if (team === 'Marketing') {
       // Marketing looks for Inbound channel deals
       dealFilters.push({
@@ -55,6 +48,7 @@ serve(async (req) => {
         value: 'Inbound',
       });
     }
+    // For SDR, we'll filter after fetching since the property might store values differently
 
     const dealsResponse = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
       method: 'POST',
@@ -74,14 +68,14 @@ serve(async (req) => {
     });
 
     const dealsData = await dealsResponse.json();
-    console.log(`Fetched ${dealsData.results?.length || 0} deals for ${repName} (${team})`);
+    console.log(`Fetched ${dealsData.results?.length || 0} raw deals for ${repName} (${team})`);
     
     // Log deal details for debugging
     if (dealsData.results && dealsData.results.length > 0) {
       console.log('Sample deal properties:', JSON.stringify(dealsData.results[0].properties, null, 2));
     }
     
-    const deals = dealsData.results?.map((d: any) => ({
+    let deals = dealsData.results?.map((d: any) => ({
       amount: parseFloat(d.properties.amount) || 0,
       closedate: d.properties.closedate,
       dealstage: d.properties.dealstage,
@@ -91,10 +85,23 @@ serve(async (req) => {
       payment_terms: d.properties.payment_terms,
     })) || [];
     
-    console.log(`Team: ${team}, Rep ID: ${repId}, Deals found: ${deals.length}`);
-    if (team === 'SDR' && deals.length > 0) {
-      console.log('SDR owner values in deals:', deals.map((d: any) => d.sdr_owner));
+    // For SDR, filter deals by sdr_owner property after fetching
+    if (team === 'SDR') {
+      console.log(`Filtering SDR deals. Looking for sdr_owner matching: ${repId}`);
+      console.log('SDR owner values before filter:', deals.map((d: any) => d.sdr_owner));
+      
+      deals = deals.filter((d: any) => {
+        // Try matching by ID or by name
+        const sdrOwnerMatch = d.sdr_owner === repId || 
+                             d.sdr_owner === repName ||
+                             d.sdr_owner?.toString() === repId?.toString();
+        return sdrOwnerMatch;
+      });
+      
+      console.log(`After filtering: ${deals.length} deals for this SDR`);
     }
+    
+    console.log(`Team: ${team}, Rep ID: ${repId}, Final deals count: ${deals.length}`);
 
     // Fetch meetings from HubSpot
     const meetingsResponse = await fetch(
