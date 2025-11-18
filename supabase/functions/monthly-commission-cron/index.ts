@@ -260,13 +260,38 @@ function calculateCommission(
 
   totalRevenue = closedWonDeals.reduce((sum, deal) => sum + deal.amount, 0);
 
+  // Apply revenue multiplier based on team
+  let adjustedRevenue = totalRevenue;
+  if (team === 'AE' && settings.ae_revenue_multiplier_brackets) {
+    const multiplierBracket = settings.ae_revenue_multiplier_brackets.find((b: any) =>
+      totalRevenue >= b.min && (b.max === null || totalRevenue < b.max)
+    );
+    if (multiplierBracket) {
+      adjustedRevenue = totalRevenue * multiplierBracket.multiplier;
+    }
+  } else if (team === 'SDR' && settings.sdr_revenue_multiplier_brackets) {
+    const multiplierBracket = settings.sdr_revenue_multiplier_brackets.find((b: any) =>
+      totalRevenue >= b.min && (b.max === null || totalRevenue < b.max)
+    );
+    if (multiplierBracket) {
+      adjustedRevenue = totalRevenue * multiplierBracket.multiplier;
+    }
+  } else if (team === 'Marketing' && settings.marketing_revenue_multiplier_brackets) {
+    const multiplierBracket = settings.marketing_revenue_multiplier_brackets.find((b: any) =>
+      totalRevenue >= b.min && (b.max === null || totalRevenue < b.max)
+    );
+    if (multiplierBracket) {
+      adjustedRevenue = totalRevenue * multiplierBracket.multiplier;
+    }
+  }
+
   if (team === 'AE') {
     const bracket = settings.ae_brackets.find((b: any) => 
-      totalRevenue >= b.min && (b.max === null || totalRevenue < b.max)
+      adjustedRevenue >= b.min && (b.max === null || adjustedRevenue < b.max)
     );
 
     if (bracket) {
-      dealCommission = totalRevenue * (bracket.percent / 100);
+      dealCommission = adjustedRevenue * (bracket.percent / 100);
     }
 
     closedWonDeals.forEach(deal => {
@@ -299,11 +324,23 @@ function calculateCommission(
       }
     });
 
-    dealCommission = totalRevenue * (settings.sdr_closed_won_percent / 100);
+    dealCommission = adjustedRevenue * (settings.sdr_closed_won_percent / 100);
   } else if (team === 'Marketing' && !settings.marketing_same_as_sdr) {
     const inboundDeals = closedWonDeals.filter(d => d.deal_channel?.toLowerCase() === 'inbound');
     const inboundRevenue = inboundDeals.reduce((sum, deal) => sum + deal.amount, 0);
-    dealCommission = inboundRevenue * (settings.marketing_inbound_percent / 100);
+    
+    // Apply multiplier to inbound revenue
+    let adjustedInboundRevenue = inboundRevenue;
+    if (settings.marketing_revenue_multiplier_brackets) {
+      const multiplierBracket = settings.marketing_revenue_multiplier_brackets.find((b: any) =>
+        inboundRevenue >= b.min && (b.max === null || inboundRevenue < b.max)
+      );
+      if (multiplierBracket) {
+        adjustedInboundRevenue = inboundRevenue * multiplierBracket.multiplier;
+      }
+    }
+    
+    dealCommission = adjustedInboundRevenue * (settings.marketing_inbound_percent / 100);
   }
 
   let usedBracketPercent: number | undefined;
