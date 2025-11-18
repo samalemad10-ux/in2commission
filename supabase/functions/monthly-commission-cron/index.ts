@@ -84,13 +84,6 @@ serve(async (req) => {
             operator: 'EQ',
             value: owner.id,
           });
-        } else if (team === 'SDR') {
-          // SDR uses the SDR OWNER property on deals
-          dealFilters.push({
-            propertyName: 'sdr_owner',
-            operator: 'EQ',
-            value: owner.id,
-          });
         } else if (team === 'Marketing') {
           // Marketing looks for Inbound channel deals
           dealFilters.push({
@@ -99,6 +92,7 @@ serve(async (req) => {
             value: 'Inbound',
           });
         }
+        // For SDR, we'll filter after fetching
 
         const dealsResponse = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
           method: 'POST',
@@ -118,9 +112,9 @@ serve(async (req) => {
         });
 
         const dealsData = await dealsResponse.json();
-        console.log(`Fetched ${dealsData.results?.length || 0} deals for ${owner.email} (${team})`);
+        console.log(`Fetched ${dealsData.results?.length || 0} raw deals for ${owner.email} (${team})`);
         
-        const deals = dealsData.results?.map((d: any) => ({
+        let deals = dealsData.results?.map((d: any) => ({
           amount: parseFloat(d.properties.amount) || 0,
           closedate: d.properties.closedate,
           dealstage: d.properties.dealstage,
@@ -129,6 +123,22 @@ serve(async (req) => {
           deal_channel: d.properties.deal_channel,
           payment_terms: d.properties.payment_terms,
         })) || [];
+        
+        // For SDR, filter deals by sdr_owner property after fetching
+        if (team === 'SDR') {
+          const ownerName = `${owner.firstName} ${owner.lastName}`;
+          console.log(`Filtering SDR deals for ${ownerName}. Looking for sdr_owner matching: ${owner.id}`);
+          
+          deals = deals.filter((d: any) => {
+            // Try matching by ID or by name
+            const sdrOwnerMatch = d.sdr_owner === owner.id || 
+                                 d.sdr_owner === ownerName ||
+                                 d.sdr_owner?.toString() === owner.id?.toString();
+            return sdrOwnerMatch;
+          });
+          
+          console.log(`After filtering: ${deals.length} deals for this SDR`);
+        }
 
         // Fetch meetings
         const meetingsResponse = await fetch('https://api.hubapi.com/crm/v3/objects/meetings/search', {
