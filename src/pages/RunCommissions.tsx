@@ -54,6 +54,33 @@ export default function RunCommissions() {
     },
   });
 
+  const testLastMonthMutation = useMutation({
+    mutationFn: async () => {
+      const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
+      const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
+      
+      const response = await supabase.functions.invoke("calculate-commission", {
+        body: {
+          repId: selectedRep,
+          repName,
+          team: repTeam,
+          startDate: lastMonthStart.toISOString(),
+          endDate: lastMonthEnd.toISOString(),
+        },
+      });
+
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setResults(data);
+      toast.success(`Successfully retrieved last month's data (${format(subMonths(new Date(), 1), 'MMM yyyy')})`);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to retrieve last month's data");
+    },
+  });
+
   const syncToHubSpotMutation = useMutation({
     mutationFn: async () => {
       const response = await supabase.functions.invoke("sync-to-hubspot", {
@@ -149,13 +176,23 @@ export default function RunCommissions() {
               </div>
             </div>
 
-            <Button
-              onClick={() => calculateMutation.mutate()}
-              disabled={!selectedRep || calculateMutation.isPending}
-              className="w-full"
-            >
-              {calculateMutation.isPending ? "Calculating..." : "Run Calculation"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => calculateMutation.mutate()}
+                disabled={!selectedRep || calculateMutation.isPending}
+                className="flex-1"
+              >
+                {calculateMutation.isPending ? "Calculating..." : "Run Calculation"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => testLastMonthMutation.mutate()}
+                disabled={!selectedRep || testLastMonthMutation.isPending}
+                className="flex-1"
+              >
+                {testLastMonthMutation.isPending ? "Loading..." : "Test Last Month"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
