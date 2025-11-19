@@ -110,7 +110,7 @@ serve(async (req) => {
                 filters: dealFilters,
               },
             ],
-            properties: ['amount', 'closedate', 'dealstage', 'deal_channel', 'payment_terms', 'sdr_owner'],
+            properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'deal_channel', 'payment_terms', 'sdr_owner'],
             limit: 100,
           }),
         });
