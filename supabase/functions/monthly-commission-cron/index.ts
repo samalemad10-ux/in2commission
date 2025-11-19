@@ -128,6 +128,17 @@ serve(async (req) => {
           payment_terms: d.properties.payment_terms,
         })) || [];
         
+        // For AE, filter deals by hubspot_owner_id after fetching
+        if (team === 'AE') {
+          console.log(`Filtering AE deals for ${owner.email}. Looking for hubspot_owner_id: ${owner.id}`);
+          
+          deals = deals.filter((d: any) => {
+            return d.hubspot_owner_id === owner.id || d.hubspot_owner_id?.toString() === owner.id?.toString();
+          });
+          
+          console.log(`After filtering: ${deals.length} deals for this AE`);
+        }
+        
         // For SDR, filter deals by sdr_owner property after fetching
         if (team === 'SDR') {
           console.log(`Filtering SDR deals for ${ownerFullName}. Looking for sdr_owner matching: email=${ownerEmail}, fullName=${ownerFullName}, id=${owner.id}`);
