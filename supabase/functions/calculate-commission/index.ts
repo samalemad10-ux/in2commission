@@ -92,7 +92,7 @@ serve(async (req) => {
             filters: dealFilters,
           },
         ],
-        properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'deal_channel', 'payment_terms', 'sdr_owner'],
+        properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'deal_channel', 'payment_terms', 'sdr_sde'],
         limit: 100,
       }),
     });
@@ -105,13 +105,13 @@ serve(async (req) => {
       console.log('Sample deal properties:', JSON.stringify(dealsData.results[0].properties, null, 2));
       console.log('Available deal property names:', Object.keys(dealsData.results[0].properties).join(', '));
       
-      // Check if sdr_owner exists
-      const hasSdrOwner = dealsData.results.some((d: any) => d.properties.sdr_owner);
-      console.log(`Deals with sdr_owner field populated: ${hasSdrOwner ? 'YES' : 'NO'}`);
+      // Check if sdr_sde exists
+      const hasSdrOwner = dealsData.results.some((d: any) => d.properties.sdr_sde);
+      console.log(`Deals with sdr_sde field populated: ${hasSdrOwner ? 'YES' : 'NO'}`);
       
-      // Log first 3 deals' sdr_owner values
+      // Log first 3 deals' sdr_sde values
       dealsData.results.slice(0, 3).forEach((d: any, i: number) => {
-        console.log(`Deal ${i + 1} sdr_owner value: ${d.properties.sdr_owner || 'NULL/EMPTY'}`);
+        console.log(`Deal ${i + 1} sdr_sde value: ${d.properties.sdr_sde || 'NULL/EMPTY'}`);
       });
     }
     
@@ -121,7 +121,7 @@ serve(async (req) => {
       closedate: d.properties.closedate,
       dealstage: d.properties.dealstage,
       hubspot_owner_id: d.properties.hubspot_owner_id,
-      sdr_owner: d.properties.sdr_owner,
+      sdr_sde: d.properties.sdr_sde,
       deal_channel: d.properties.deal_channel,
       payment_terms: d.properties.payment_terms,
     })) || [];
