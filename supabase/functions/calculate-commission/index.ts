@@ -111,30 +111,50 @@ serve(async (req) => {
       console.log(`Filtering SDR deals by sdr_owner for ${repName}`);
       console.log(`Looking for matches with: email="${ownerEmail}", fullName="${ownerFullName}", id="${repId}"`);
       
+      // Normalize comparison values
+      const normalizedEmail = ownerEmail?.toString().trim().toLowerCase() || '';
+      const normalizedFullName = ownerFullName?.toString().trim().toLowerCase() || '';
+      const normalizedRepId = repId?.toString().trim().toLowerCase() || '';
+      
       deals = deals.filter((d: any) => {
         const sdrOwner = d.sdr_owner;
         if (!sdrOwner) {
           return false;
         }
         
-        // Try exact email match
-        if (sdrOwner === ownerEmail) {
-          console.log(`✓ Deal matched by email: ${sdrOwner}`);
+        const normalizedSdrOwner = sdrOwner.toString().trim().toLowerCase();
+        
+        // Rule 1: Exact email match
+        if (normalizedSdrOwner === normalizedEmail) {
+          console.log(`✓ Deal matched by EXACT email: "${sdrOwner}"`);
           return true;
         }
         
-        // Try exact full name match
-        if (sdrOwner === ownerFullName) {
-          console.log(`✓ Deal matched by full name: ${sdrOwner}`);
+        // Rule 2: Exact full name match
+        if (normalizedSdrOwner === normalizedFullName) {
+          console.log(`✓ Deal matched by EXACT full name: "${sdrOwner}"`);
           return true;
         }
         
-        // Try owner ID match (both string and number)
-        if (sdrOwner === repId || sdrOwner?.toString() === repId?.toString()) {
-          console.log(`✓ Deal matched by owner ID: ${sdrOwner}`);
+        // Rule 3: Exact ID match
+        if (normalizedSdrOwner === normalizedRepId) {
+          console.log(`✓ Deal matched by EXACT owner ID: "${sdrOwner}"`);
           return true;
         }
         
+        // Rule 4: Partial email match (sdr_owner contains email)
+        if (normalizedEmail && normalizedSdrOwner.includes(normalizedEmail)) {
+          console.log(`✓ Deal matched by PARTIAL email: "${sdrOwner}" contains "${ownerEmail}"`);
+          return true;
+        }
+        
+        // Rule 5: Partial full name match (sdr_owner contains full name)
+        if (normalizedFullName && normalizedSdrOwner.includes(normalizedFullName)) {
+          console.log(`✓ Deal matched by PARTIAL full name: "${sdrOwner}" contains "${ownerFullName}"`);
+          return true;
+        }
+        
+        console.log(`✗ Deal NOT matched: sdr_owner="${sdrOwner}"`);
         return false;
       });
       
