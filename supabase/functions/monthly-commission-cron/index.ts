@@ -119,6 +119,7 @@ serve(async (req) => {
         })) || [];
         
         console.log(`Initial deals fetched: ${deals.length} for ${owner.email}`);
+        console.log('Sample sdr_owner values:', deals.slice(0, 5).map((d: any) => d.sdr_owner));
         
         // Filter by team type
         if (isAE) {
@@ -130,13 +131,37 @@ serve(async (req) => {
           
           console.log(`After AE filter: ${deals.length} deals for ${owner.email}`);
         } else if (isSDR) {
-          console.log(`Filtering SDR deals by outbound channel for ${owner.email}`);
+          console.log(`Filtering SDR deals by sdr_owner for ${owner.email}`);
+          console.log(`Looking for matches with: email="${ownerEmail}", fullName="${ownerFullName}", id="${owner.id}"`);
           
           deals = deals.filter((d: any) => {
-            return d.deal_channel?.toLowerCase() === 'outbound';
+            const sdrOwner = d.sdr_owner;
+            if (!sdrOwner) {
+              return false;
+            }
+            
+            // Try exact email match
+            if (sdrOwner === ownerEmail) {
+              console.log(`✓ Deal matched by email: ${sdrOwner}`);
+              return true;
+            }
+            
+            // Try exact full name match
+            if (sdrOwner === ownerFullName) {
+              console.log(`✓ Deal matched by full name: ${sdrOwner}`);
+              return true;
+            }
+            
+            // Try owner ID match (both string and number)
+            if (sdrOwner === owner.id || sdrOwner?.toString() === owner.id?.toString()) {
+              console.log(`✓ Deal matched by owner ID: ${sdrOwner}`);
+              return true;
+            }
+            
+            return false;
           });
           
-          console.log(`After SDR filter: ${deals.length} outbound deals for ${owner.email}`);
+          console.log(`After SDR filter: ${deals.length} deals attributed to ${owner.email}`);
         } else if (isMarketing) {
           console.log(`Filtering Marketing deals by inbound channel for ${owner.email}`);
           
