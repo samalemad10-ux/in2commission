@@ -82,6 +82,16 @@ serve(async (req) => {
     // Log deal details for debugging
     if (dealsData.results && dealsData.results.length > 0) {
       console.log('Sample deal properties:', JSON.stringify(dealsData.results[0].properties, null, 2));
+      console.log('Available deal property names:', Object.keys(dealsData.results[0].properties).join(', '));
+      
+      // Check if sdr_owner exists
+      const hasSdrOwner = dealsData.results.some((d: any) => d.properties.sdr_owner);
+      console.log(`Deals with sdr_owner field populated: ${hasSdrOwner ? 'YES' : 'NO'}`);
+      
+      // Log first 3 deals' sdr_owner values
+      dealsData.results.slice(0, 3).forEach((d: any, i: number) => {
+        console.log(`Deal ${i + 1} sdr_owner value: ${d.properties.sdr_owner || 'NULL/EMPTY'}`);
+      });
     }
     
     // Step 1: Map all deals with properties (no classification)
