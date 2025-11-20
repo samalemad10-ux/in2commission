@@ -18,6 +18,27 @@ serve(async (req) => {
       throw new Error('HubSpot token not configured');
     }
 
+    // Fetch all available deal properties to find the SDR field
+    console.log('Fetching all HubSpot deal properties...');
+    const propsResponse = await fetch('https://api.hubapi.com/crm/v3/properties/deals', {
+      headers: {
+        'Authorization': `Bearer ${hubspotToken}`,
+      },
+    });
+    
+    if (propsResponse.ok) {
+      const propsData = await propsResponse.json();
+      const allPropNames = propsData.results.map((p: any) => p.name);
+      console.log('All available deal properties:', allPropNames.join(', '));
+      
+      // Find SDR-related properties
+      const sdrProps = propsData.results.filter((p: any) => 
+        p.name.toLowerCase().includes('sdr') || 
+        p.label?.toLowerCase().includes('sdr')
+      );
+      console.log('SDR-related properties found:', JSON.stringify(sdrProps.map((p: any) => ({ name: p.name, label: p.label })), null, 2));
+    }
+
     // For SDR, fetch owner details from HubSpot to get email and name variations
     let ownerEmail = '';
     let ownerFullName = '';
