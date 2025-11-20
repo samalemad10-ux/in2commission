@@ -142,13 +142,8 @@ serve(async (req) => {
         sdr: deal.sdr_sde?.toString().trim().toLowerCase() || '',
       };
       
-      // A) SDR attribution: sdr_sde matches SDR name or email
-      if (normalized.sdr && (
-        normalized.sdr === normalizedFullName ||
-        normalized.sdr.includes(normalizedFullName) ||
-        normalized.sdr === normalizedEmail ||
-        normalized.sdr.includes(normalizedEmail)
-      )) {
+      // A) SDR attribution: sdr_sde matches rep ID (it's an owner ID, not a name)
+      if (normalized.sdr === normalizedRepId) {
         deal.assignedTo.push('SDR');
       }
       
