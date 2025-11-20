@@ -36,7 +36,15 @@ serve(async (req) => {
       }
     }
 
-    // Fetch deals from HubSpot - different filter logic based on team
+    // Normalize team name for comparison
+    const teamLower = team.toLowerCase();
+    const isAE = teamLower.includes('ae');
+    const isSDR = teamLower.includes('sdr');
+    const isMarketing = teamLower.includes('marketing');
+    
+    console.log(`Processing ${repName} - Team: ${team} (isAE: ${isAE}, isSDR: ${isSDR}, isMarketing: ${isMarketing})`);
+
+    // Fetch deals from HubSpot - only date filters, we'll filter by owner after
     let dealFilters: any[] = [
       {
         propertyName: 'closedate',
@@ -49,17 +57,6 @@ serve(async (req) => {
         value: new Date(endDate).getTime(),
       },
     ];
-
-    // Team-specific filtering
-    if (team === 'AE') {
-      // AE uses standard owner property
-      dealFilters.push({
-        propertyName: 'hubspot_owner_id',
-        operator: 'EQ',
-        value: repId,
-      });
-    }
-    // For SDR and Marketing, we'll filter after fetching based on deal_channel
 
     const dealsResponse = await fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
       method: 'POST',
@@ -96,46 +93,42 @@ serve(async (req) => {
       payment_terms: d.properties.payment_terms,
     })) || [];
     
-    // For AE, filter deals by hubspot_owner_id after fetching
-    if (team === 'AE') {
+    console.log(`Initial deals fetched: ${deals.length}`);
+    console.log('Sample owner IDs:', deals.slice(0, 5).map((d: any) => d.hubspot_owner_id));
+    console.log('Sample channels:', deals.slice(0, 5).map((d: any) => d.deal_channel));
+    
+    // Filter by team type
+    if (isAE) {
       console.log(`Filtering AE deals. Looking for hubspot_owner_id: ${repId}`);
-      console.log('Owner IDs before filter:', deals.map((d: any) => d.hubspot_owner_id).slice(0, 10));
       
       deals = deals.filter((d: any) => {
         return d.hubspot_owner_id === repId || d.hubspot_owner_id?.toString() === repId?.toString();
       });
       
-      console.log(`After filtering: ${deals.length} deals for this AE`);
-    }
-    
-    // For SDR, filter deals by outbound channel
-    if (team === 'SDR' || team === "SDR's Sales Department") {
+      console.log(`After AE filter: ${deals.length} deals for ${repName}`);
+    } else if (isSDR) {
       console.log(`Filtering SDR deals by outbound channel for ${repName}`);
-      console.log('Deal channels before filter:', deals.map((d: any) => d.deal_channel).slice(0, 10));
       
       deals = deals.filter((d: any) => {
         return d.deal_channel?.toLowerCase() === 'outbound';
       });
       
-      console.log(`After filtering: ${deals.length} outbound deals for this SDR`);
-    }
-    
-    // For Marketing, filter deals by inbound channel
-    if (team === 'Marketing' || team === 'Marketing Team') {
+      console.log(`After SDR filter: ${deals.length} outbound deals for ${repName}`);
+    } else if (isMarketing) {
       console.log(`Filtering Marketing deals by inbound channel`);
       
       deals = deals.filter((d: any) => {
         return d.deal_channel?.toLowerCase() === 'inbound';
       });
       
-      console.log(`After filtering: ${deals.length} inbound deals for Marketing`);
+      console.log(`After Marketing filter: ${deals.length} inbound deals`);
     }
     
-    console.log(`Team: ${team}, Rep ID: ${repId}, Final deals count: ${deals.length}`);
+    console.log(`Final: Team=${team}, RepID=${repId}, Deals=${deals.length}`);
 
     // Fetch meetings from HubSpot (only for SDR team)
     let meetings: any[] = [];
-    if (team === 'SDR' || team === "SDR's Sales Department") {
+    if (isSDR) {
       const meetingsResponse = await fetch(
         `https://api.hubapi.com/crm/v3/objects/meetings/search`,
         {
@@ -285,7 +278,12 @@ function calculateCommission(
     }
   }
 
-  if (team === 'AE') {
+  const teamLower = team.toLowerCase();
+  const isAE = teamLower.includes('ae');
+  const isSDR = teamLower.includes('sdr');
+  const isMarketing = teamLower.includes('marketing');
+
+  if (isAE) {
     const bracket = settings.ae_brackets.find((b: any) => 
       adjustedRevenue >= b.min && (b.max === null || adjustedRevenue < b.max)
     );
@@ -304,7 +302,7 @@ function calculateCommission(
         }
       }
     });
-  } else if (team === 'SDR' || (team === 'Marketing' && settings.marketing_same_as_sdr)) {
+  } else if (isSDR || (isMarketing && settings.marketing_same_as_sdr)) {
     const weeklyMeetings: Record<number, any[]> = {};
     meetings.forEach(meeting => {
       const date = new Date(meeting.timestamp);
@@ -325,7 +323,7 @@ function calculateCommission(
     });
 
     dealCommission = adjustedRevenue * (settings.sdr_closed_won_percent / 100);
-  } else if (team === 'Marketing' && !settings.marketing_same_as_sdr) {
+  } else if (isMarketing && !settings.marketing_same_as_sdr) {
     const inboundDeals = closedWonDeals.filter(d => d.deal_channel?.toLowerCase() === 'inbound');
     const inboundRevenue = inboundDeals.reduce((sum, deal) => sum + deal.amount, 0);
     
