@@ -100,7 +100,7 @@ serve(async (req) => {
                 filters: dealFilters,
               },
             ],
-            properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'deal_channel', 'payment_terms', 'sdr_owner'],
+            properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'deal_channel', 'payment_terms', 'sdr_sde'],
             limit: 100,
           }),
         });
@@ -114,7 +114,7 @@ serve(async (req) => {
           closedate: d.properties.closedate,
           dealstage: d.properties.dealstage,
           hubspot_owner_id: d.properties.hubspot_owner_id,
-          sdr_owner: d.properties.sdr_owner,
+          sdr_sde: d.properties.sdr_sde,
           deal_channel: d.properties.deal_channel,
           payment_terms: d.properties.payment_terms,
         })) || [];
