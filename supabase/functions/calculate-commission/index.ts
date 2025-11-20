@@ -21,7 +21,8 @@ serve(async (req) => {
     // For SDR, fetch owner details from HubSpot to get email and name variations
     let ownerEmail = '';
     let ownerFullName = '';
-    if (team === 'SDR') {
+    const teamLowerCheck = team.toLowerCase();
+    if (teamLowerCheck.includes('sdr')) {
       const ownerResponse = await fetch(`https://api.hubapi.com/crm/v3/owners/${repId}`, {
         headers: {
           'Authorization': `Bearer ${hubspotToken}`,
