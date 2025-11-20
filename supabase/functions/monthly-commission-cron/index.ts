@@ -108,53 +108,67 @@ serve(async (req) => {
         const dealsData = await dealsResponse.json();
         console.log(`Fetched ${dealsData.results?.length || 0} raw deals for ${owner.email} (${team})`);
         
-        // Step 1: Map and classify each deal with normalized assignedTo field
-        let deals = dealsData.results?.map((d: any) => {
-          const sdrOwner = d.properties.sdr_owner?.toString().trim().toLowerCase() || '';
-          const dealChannel = d.properties.deal_channel?.toString().trim().toLowerCase() || '';
-          const hubspotOwnerId = d.properties.hubspot_owner_id?.toString().trim().toLowerCase() || '';
-          
-          // Central classification logic
-          let assignedTo = '';
-          if (sdrOwner) {
-            assignedTo = `sdr:${sdrOwner}`;
-          } else if (dealChannel === 'inbound') {
-            assignedTo = 'marketing';
-          } else {
-            assignedTo = `ae:${hubspotOwnerId}`;
-          }
-          
-          return {
-            amount: parseFloat(d.properties.amount) || 0,
-            closedate: d.properties.closedate,
-            dealstage: d.properties.dealstage,
-            hubspot_owner_id: d.properties.hubspot_owner_id,
-            sdr_owner: d.properties.sdr_owner,
-            deal_channel: d.properties.deal_channel,
-            payment_terms: d.properties.payment_terms,
-            assignedTo, // New classification field
-          };
-        }) || [];
+        // Step 1: Map all deals with properties (no classification)
+        let deals = dealsData.results?.map((d: any) => ({
+          amount: parseFloat(d.properties.amount) || 0,
+          closedate: d.properties.closedate,
+          dealstage: d.properties.dealstage,
+          hubspot_owner_id: d.properties.hubspot_owner_id,
+          sdr_owner: d.properties.sdr_owner,
+          deal_channel: d.properties.deal_channel,
+          payment_terms: d.properties.payment_terms,
+        })) || [];
         
-        console.log(`Initial deals fetched for ${owner.email}: ${deals.length}`);
-        console.log('Sample assignedTo:', deals.slice(0, 5).map((d: any) => d.assignedTo));
+        console.log(`Fetched ${deals.length} deals for ${owner.email}`);
         
-        // Step 2: Filter deals deterministically using assignedTo field
+        // Step 2: Filter deals independently based on team criteria
         const normalizedRepId = owner.id?.toString().trim().toLowerCase() || '';
         const normalizedEmail = ownerEmail?.toString().trim().toLowerCase() || '';
+        const normalizedFullName = ownerFullName?.toString().trim().toLowerCase() || '';
         
         if (isAE) {
-          console.log(`Filtering AE deals. Looking for assignedTo: ae:${normalizedRepId}`);
-          deals = deals.filter((d: any) => d.assignedTo === `ae:${normalizedRepId}`);
-          console.log(`After AE filter: ${deals.length} deals`);
+          console.log(`Filtering AE deals for repId: ${normalizedRepId}`);
+          deals = deals.filter((d: any) => {
+            const ownerId = d.hubspot_owner_id?.toString().trim().toLowerCase() || '';
+            const match = ownerId === normalizedRepId;
+            if (match) {
+              console.log(`AE match: deal hubspot_owner_id=${ownerId}, amount=${d.amount}`);
+            }
+            return match;
+          });
+          console.log(`After AE filter: ${deals.length} deals for ${owner.email}`);
         } else if (isSDR) {
-          console.log(`Filtering SDR deals. Looking for assignedTo: sdr:${normalizedEmail}`);
-          deals = deals.filter((d: any) => d.assignedTo === `sdr:${normalizedEmail}`);
-          console.log(`After SDR filter: ${deals.length} deals`);
+          console.log(`Filtering SDR deals. Looking for sdr_owner matching: email=${normalizedEmail}, fullName=${normalizedFullName}, id=${normalizedRepId}`);
+          deals = deals.filter((d: any) => {
+            const sdrOwner = d.sdr_owner?.toString().trim().toLowerCase() || '';
+            if (!sdrOwner) return false;
+            
+            const emailMatch = sdrOwner === normalizedEmail;
+            const nameMatch = sdrOwner === normalizedFullName;
+            const idMatch = sdrOwner === normalizedRepId;
+            
+            if (emailMatch) {
+              console.log(`SDR match by email: ${sdrOwner}, amount=${d.amount}`);
+            } else if (nameMatch) {
+              console.log(`SDR match by full name: ${sdrOwner}, amount=${d.amount}`);
+            } else if (idMatch) {
+              console.log(`SDR match by id: ${sdrOwner}, amount=${d.amount}`);
+            }
+            
+            return emailMatch || nameMatch || idMatch;
+          });
+          console.log(`After SDR filter: ${deals.length} deals for ${owner.email}`);
         } else if (isMarketing) {
-          console.log(`Filtering Marketing deals. Looking for assignedTo: marketing`);
-          deals = deals.filter((d: any) => d.assignedTo === 'marketing');
-          console.log(`After Marketing filter: ${deals.length} deals`);
+          console.log(`Filtering Marketing deals. Looking for deal_channel=inbound`);
+          deals = deals.filter((d: any) => {
+            const channel = d.deal_channel?.toString().trim().toLowerCase() || '';
+            const match = channel === 'inbound';
+            if (match) {
+              console.log(`Marketing match: deal_channel=${channel}, amount=${d.amount}`);
+            }
+            return match;
+          });
+          console.log(`After Marketing filter: ${deals.length} deals for ${owner.email}`);
         }
         
         console.log(`Final: Team=${team}, OwnerID=${owner.id}, Deals=${deals.length}`);
