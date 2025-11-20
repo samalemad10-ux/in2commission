@@ -96,6 +96,7 @@ serve(async (req) => {
     console.log(`Initial deals fetched: ${deals.length}`);
     console.log('Sample owner IDs:', deals.slice(0, 5).map((d: any) => d.hubspot_owner_id));
     console.log('Sample channels:', deals.slice(0, 5).map((d: any) => d.deal_channel));
+    console.log('Sample sdr_owner:', deals.slice(0, 5).map((d: any) => d.sdr_owner));
     
     // Filter by team type
     if (isAE) {
@@ -107,13 +108,37 @@ serve(async (req) => {
       
       console.log(`After AE filter: ${deals.length} deals for ${repName}`);
     } else if (isSDR) {
-      console.log(`Filtering SDR deals by outbound channel for ${repName}`);
+      console.log(`Filtering SDR deals by sdr_owner for ${repName}`);
+      console.log(`Looking for matches with: email="${ownerEmail}", fullName="${ownerFullName}", id="${repId}"`);
       
       deals = deals.filter((d: any) => {
-        return d.deal_channel?.toLowerCase() === 'outbound';
+        const sdrOwner = d.sdr_owner;
+        if (!sdrOwner) {
+          return false;
+        }
+        
+        // Try exact email match
+        if (sdrOwner === ownerEmail) {
+          console.log(`✓ Deal matched by email: ${sdrOwner}`);
+          return true;
+        }
+        
+        // Try exact full name match
+        if (sdrOwner === ownerFullName) {
+          console.log(`✓ Deal matched by full name: ${sdrOwner}`);
+          return true;
+        }
+        
+        // Try owner ID match (both string and number)
+        if (sdrOwner === repId || sdrOwner?.toString() === repId?.toString()) {
+          console.log(`✓ Deal matched by owner ID: ${sdrOwner}`);
+          return true;
+        }
+        
+        return false;
       });
       
-      console.log(`After SDR filter: ${deals.length} outbound deals for ${repName}`);
+      console.log(`After SDR filter: ${deals.length} deals attributed to ${repName}`);
     } else if (isMarketing) {
       console.log(`Filtering Marketing deals by inbound channel`);
       
