@@ -143,7 +143,7 @@ serve(async (req) => {
       };
       
       // A) SDR attribution: sdr_sde matches SDR name or email
-      if (isSDR && normalized.sdr && (
+      if (normalized.sdr && (
         normalized.sdr === normalizedFullName ||
         normalized.sdr.includes(normalizedFullName) ||
         normalized.sdr === normalizedEmail ||
