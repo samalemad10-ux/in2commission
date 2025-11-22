@@ -173,9 +173,9 @@ serve(async (req) => {
     
     console.log(`Final: Team=${team}, RepID=${repId}, Deals=${deals.length}`);
 
-    // Fetch meetings from HubSpot (only for SDR team)
+    // Fetch meetings from HubSpot (for SDR and Marketing teams)
     let meetings: any[] = [];
-    if (isSDR) {
+    if (isSDR || isMarketing) {
       const meetingsResponse = await fetch(
         `https://api.hubapi.com/crm/v3/objects/meetings/search`,
         {
@@ -225,6 +225,8 @@ serve(async (req) => {
         })
         .map((m: any) => ({
           timestamp: new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString(),
+          type: m.properties.hs_meeting_type,
+          outcome: m.properties.hs_meeting_outcome,
         })) || [];
       
       console.log(`After filtering: ${meetings.length} qualifying meetings (sales discovery + completed)`);
