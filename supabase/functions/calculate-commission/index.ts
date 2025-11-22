@@ -174,62 +174,73 @@ serve(async (req) => {
     console.log(`Final: Team=${team}, RepID=${repId}, Deals=${deals.length}`);
 
     // Fetch meetings from HubSpot (for SDR and Marketing teams)
+    // Meetings count based on deal channel: inbound = Marketing, outbound = SDR
     let meetings: any[] = [];
     if (isSDR || isMarketing) {
-      const meetingsResponse = await fetch(
-        `https://api.hubapi.com/crm/v3/objects/meetings/search`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${hubspotToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            filterGroups: [
-              {
-                filters: [
-                  {
-                    propertyName: 'hubspot_owner_id',
-                    operator: 'EQ',
-                    value: repId,
-                  },
-                  {
-                    propertyName: 'hs_meeting_start_time',
-                    operator: 'GTE',
-                    value: new Date(startDate).getTime(),
-                  },
-                  {
-                    propertyName: 'hs_meeting_start_time',
-                    operator: 'LTE',
-                    value: new Date(endDate).getTime(),
-                  },
-                ],
-              },
-            ],
-            properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome'],
-            limit: 1000,
-          }),
-        }
-      );
+      // Check if rep has deals with the appropriate channel
+      const hasInboundDeals = deals.some(d => d.deal_channel?.toLowerCase() === 'inbound');
+      const hasOutboundDeals = deals.some(d => d.deal_channel?.toLowerCase() === 'outbound');
+      
+      const shouldFetchMeetings = (isMarketing && hasInboundDeals) || (isSDR && hasOutboundDeals);
+      
+      if (shouldFetchMeetings) {
+        const meetingsResponse = await fetch(
+          `https://api.hubapi.com/crm/v3/objects/meetings/search`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${hubspotToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filterGroups: [
+                {
+                  filters: [
+                    {
+                      propertyName: 'hubspot_owner_id',
+                      operator: 'EQ',
+                      value: repId,
+                    },
+                    {
+                      propertyName: 'hs_meeting_start_time',
+                      operator: 'GTE',
+                      value: new Date(startDate).getTime(),
+                    },
+                    {
+                      propertyName: 'hs_meeting_start_time',
+                      operator: 'LTE',
+                      value: new Date(endDate).getTime(),
+                    },
+                  ],
+                },
+              ],
+              properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome'],
+              limit: 1000,
+            }),
+          }
+        );
 
-      const meetingsData = await meetingsResponse.json();
-      console.log(`Fetched ${meetingsData.results?.length || 0} raw meetings for ${repName}`);
-      
-      // Filter for "sales discovery meeting" type with "completed" outcome
-      meetings = meetingsData.results
-        ?.filter((m: any) => {
-          const meetingType = m.properties.hs_meeting_type?.toLowerCase() || '';
-          const outcome = m.properties.hs_meeting_outcome?.toLowerCase() || '';
-          const isMatch = meetingType.includes('sales discovery meeting') && outcome === 'completed';
-          return isMatch;
-        })
-        .map((m: any) => ({
-          timestamp: new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString(),
-          type: m.properties.hs_meeting_type,
-          outcome: m.properties.hs_meeting_outcome,
-        })) || [];
-      
-      console.log(`After filtering: ${meetings.length} qualifying meetings (sales discovery + completed)`);
+        const meetingsData = await meetingsResponse.json();
+        console.log(`Fetched ${meetingsData.results?.length || 0} raw meetings for ${repName} (${isMarketing ? 'inbound' : 'outbound'} channel)`);
+        
+        // Filter for "sales discovery meeting" type with "completed" outcome
+        meetings = meetingsData.results
+          ?.filter((m: any) => {
+            const meetingType = m.properties.hs_meeting_type?.toLowerCase() || '';
+            const outcome = m.properties.hs_meeting_outcome?.toLowerCase() || '';
+            const isMatch = meetingType.includes('sales discovery meeting') && outcome === 'completed';
+            return isMatch;
+          })
+          .map((m: any) => ({
+            timestamp: new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString(),
+            type: m.properties.hs_meeting_type,
+            outcome: m.properties.hs_meeting_outcome,
+          })) || [];
+        
+        console.log(`After filtering: ${meetings.length} qualifying meetings (sales discovery + completed)`);
+      } else {
+        console.log(`No ${isMarketing ? 'inbound' : 'outbound'} deals found for ${repName}, skipping meeting fetch`);
+      }
     }
 
     // Fetch commission settings from Supabase
