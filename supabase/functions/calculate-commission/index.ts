@@ -92,7 +92,17 @@ serve(async (req) => {
             filters: dealFilters,
           },
         ],
-        properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'channel', 'payment_terms', 'sdr_sde'],
+        properties: [
+          'amount',
+          'closedate',
+          'dealstage',
+          'hubspot_owner_id',
+          'channel',
+          'deal_channel',
+          'payment_terms',
+          'sdr_owner',
+          'sdr_sde',
+        ],
         limit: 100,
       }),
     });
@@ -116,16 +126,27 @@ serve(async (req) => {
     }
     
     // Step 1: Map all deals with properties (no pre-filtering)
-    let allDeals = dealsData.results?.map((d: any) => ({
-      amount: parseFloat(d.properties.amount) || 0,
-      closedate: d.properties.closedate,
-      dealstage: d.properties.dealstage,
-      hubspot_owner_id: d.properties.hubspot_owner_id,
-      sdr_sde: d.properties.sdr_sde,
-      channel: d.properties.channel,
-      payment_terms: d.properties.payment_terms,
-      assignedTo: [] as string[], // Will hold ["AE"], ["SDR"], ["Marketing"], or combinations
-    })) || [];
+    let allDeals = dealsData.results?.map((d: any) => {
+      const p = d.properties;
+
+      const sdrOwner =
+        (p.sdr_owner ?? p.sdr_sde ?? "").toString().trim();
+
+      const channel =
+        (p.channel ?? p.deal_channel ?? "").toString().trim();
+
+      return {
+        id: d.id,
+        amount: parseFloat(p.amount) || 0,
+        closedate: p.closedate,
+        dealstage: p.dealstage,
+        hubspot_owner_id: p.hubspot_owner_id,
+        sdr_owner: sdrOwner,
+        channel,
+        payment_terms: p.payment_terms,
+        assignedTo: [],
+      };
+    }) || [];
     
     console.log(`Fetched ${allDeals.length} total deals for classification`);
     
@@ -150,22 +171,12 @@ serve(async (req) => {
         sdr: deal.sdr_sde?.toString().trim().toLowerCase() || '',
       };
       
-      // A) SDR attribution: sdr_sde matches this SDR (by id, email, or name)
-      if (normalized.sdr) {
-        const sdrValue = normalized.sdr; // already lowercased/trimmed
-
-        const matchesId =
-          normalizedRepId &&
-          (sdrValue === normalizedRepId || sdrValue.includes(normalizedRepId));
-
-        const matchesEmail =
-          normalizedEmail &&
-          (sdrValue === normalizedEmail || sdrValue.includes(normalizedEmail));
-
-        const matchesName =
-          normalizedFullName &&
-          (sdrValue === normalizedFullName || sdrValue.includes(normalizedFullName));
-
+      // SDR attribution
+      if (deal.sdr_owner) {
+        const sdr = deal.sdr_owner.toLowerCase();
+        const matchesId = normalizedRepId && (sdr === normalizedRepId || sdr.includes(normalizedRepId));
+        const matchesEmail = normalizedEmail && (sdr === normalizedEmail || sdr.includes(normalizedEmail));
+        const matchesName = normalizedFullName && (sdr === normalizedFullName || sdr.includes(normalizedFullName));
         if (matchesId || matchesEmail || matchesName) {
           deal.assignedTo.push("SDR");
         }
@@ -201,97 +212,62 @@ serve(async (req) => {
     let meetings: any[] = [];
     
     if (isSDR) {
-      // SDRs get credit for meetings associated with their outbound deals
       console.log(`Fetching SDR meetings for ${repName}...`);
-      
+
       try {
-        // Get SDR's outbound deals
-        const sdrOutboundDeals = deals.filter(d => 
-          d.assignedTo.includes('SDR') && 
-          d.channel?.toLowerCase() === 'outbound'
+        const sdrOutboundDeals = deals.filter(d =>
+          d.assignedTo.includes("SDR") &&
+          (d.channel ?? "").toLowerCase() === "outbound"
         );
-        
-        console.log(`Found ${sdrOutboundDeals.length} outbound deals for SDR`);
-        
-        // For each deal, fetch associated meetings
+
+        console.log(`SDR outbound deals: ${sdrOutboundDeals.length}`);
+
         for (const deal of sdrOutboundDeals) {
-          // Find the original deal record to get the deal ID
-          const dealRecord = dealsData.results?.find((d: any) => 
-            d.properties.hubspot_owner_id === deal.hubspot_owner_id &&
-            parseFloat(d.properties.amount) === deal.amount &&
-            d.properties.closedate === deal.closedate
-          );
-          
-          if (!dealRecord) {
-            console.log(`Could not find deal record for deal with owner ${deal.hubspot_owner_id}`);
-            continue;
-          }
-          
-          const dealId = dealRecord.id;
-          console.log(`Fetching meetings for deal ${dealId}`);
-          
-          // Fetch associated meetings using associations API
-          const associationsResponse = await fetch(
+          const dealId = deal.id;
+          if (!dealId) continue;
+
+          const assocResp = await fetch(
             `https://api.hubapi.com/crm/v4/objects/deals/${dealId}/associations/meetings`,
-            {
-              headers: {
-                'Authorization': `Bearer ${hubspotToken}`,
-              },
-            }
+            { headers: { Authorization: `Bearer ${hubspotToken}` } }
           );
-          
-          if (!associationsResponse.ok) {
-            console.log(`Failed to fetch associations for deal ${dealId}: ${associationsResponse.status}`);
-            continue;
-          }
-          
-          const associationsData = await associationsResponse.json();
-          const meetingIds = associationsData.results?.map((r: any) => r.toObjectId) || [];
-          
-          console.log(`Found ${meetingIds.length} associated meetings for deal ${dealId}`);
-          
-          // Fetch meeting details for each meeting ID
+
+          if (!assocResp.ok) continue;
+
+          const assocData = await assocResp.json();
+          const meetingIds = assocData.results?.map((r: any) => r.toObjectId) || [];
+
           for (const meetingId of meetingIds) {
-            const meetingResponse = await fetch(
+            const mtResp = await fetch(
               `https://api.hubapi.com/crm/v3/objects/meetings/${meetingId}?properties=hs_meeting_start_time,hs_meeting_type,hs_meeting_outcome`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${hubspotToken}`,
-                },
-              }
+              { headers: { Authorization: `Bearer ${hubspotToken}` } }
             );
-            
-            if (!meetingResponse.ok) {
-              console.log(`Failed to fetch meeting ${meetingId}: ${meetingResponse.status}`);
-              continue;
-            }
-            
-            const meetingData = await meetingResponse.json();
-            const meetingType = meetingData.properties.hs_meeting_type?.toLowerCase() || '';
-            const outcome = meetingData.properties.hs_meeting_outcome?.toLowerCase() || '';
-            
-            // Filter for "sales discovery meeting" with "completed" outcome
-            if (meetingType.includes('sales discovery meeting') && outcome === 'completed') {
-              const meetingTimestamp = parseInt(meetingData.properties.hs_meeting_start_time);
-              const meetingDate = new Date(meetingTimestamp);
-              
-              // Check if meeting is within date range
-              if (meetingDate >= new Date(startDate) && meetingDate <= new Date(endDate)) {
+            if (!mtResp.ok) continue;
+
+            const mt = await mtResp.json();
+            const type = (mt.properties.hs_meeting_type ?? "").toLowerCase();
+            const outcome = (mt.properties.hs_meeting_outcome ?? "").toLowerCase();
+
+            const isSD = type.includes("sales") && type.includes("discovery");
+            const isCompleted = outcome === "completed";
+
+            if (isSD && isCompleted) {
+              const ts = parseInt(mt.properties.hs_meeting_start_time);
+              const dt = new Date(ts);
+              if (dt >= new Date(startDate) && dt <= new Date(endDate)) {
                 meetings.push({
-                  timestamp: meetingDate.toISOString(),
-                  type: meetingData.properties.hs_meeting_type,
-                  outcome: meetingData.properties.hs_meeting_outcome,
-                  dealId: dealId,
+                  timestamp: dt.toISOString(),
+                  type: mt.properties.hs_meeting_type,
+                  outcome: mt.properties.hs_meeting_outcome,
+                  dealId,
                 });
-                console.log(`Added qualifying meeting ${meetingId} from deal ${dealId}`);
               }
             }
           }
         }
-        
-        console.log(`Total SDR meetings: ${meetings.length}`);
-      } catch (error) {
-        console.error('Error fetching SDR meetings:', error);
+
+        console.log(`Total SDR meetings counted: ${meetings.length}`);
+      } catch (err) {
+        console.error("SDR meeting error:", err);
       }
     } else if (isMarketing) {
       // Marketing fetches their own meetings
