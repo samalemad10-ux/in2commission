@@ -215,53 +215,78 @@ serve(async (req) => {
       console.log(`Fetching SDR meetings for ${repName}...`);
 
       try {
-        const sdrOutboundDeals = deals.filter(d =>
-          d.assignedTo.includes("SDR") &&
-          (d.channel ?? "").toLowerCase() === "outbound"
+        // Step 1: Fetch ALL meetings in date range that are "sales discovery meeting" + "completed"
+        const meetingsResponse = await fetch(
+          `https://api.hubapi.com/crm/v3/objects/meetings/search`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${hubspotToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filterGroups: [
+                {
+                  filters: [
+                    {
+                      propertyName: 'hs_meeting_start_time',
+                      operator: 'GTE',
+                      value: new Date(startDate).getTime(),
+                    },
+                    {
+                      propertyName: 'hs_meeting_start_time',
+                      operator: 'LTE',
+                      value: new Date(endDate).getTime(),
+                    },
+                  ],
+                },
+              ],
+              properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome', 'hubspot_owner_id'],
+              limit: 1000,
+            }),
+          }
         );
+
+        const meetingsData = await meetingsResponse.json();
+        console.log(`Fetched ${meetingsData.results?.length || 0} raw meetings in date range`);
+
+        // Filter for sales discovery + completed
+        const qualifiedMeetings = (meetingsData.results || []).filter((m: any) => {
+          const meetingType = m.properties.hs_meeting_type?.toLowerCase() || '';
+          const outcome = m.properties.hs_meeting_outcome?.toLowerCase() || '';
+          return meetingType.includes('sales') && meetingType.includes('discovery') && outcome === 'completed';
+        });
+
+        console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
+
+        // Step 2: Find all outbound deals where this SDR is attributed
+        const sdrOutboundDeals = allDeals.filter((d: any) => {
+          if (!d.assignedTo.includes('SDR')) return false;
+          const ch = (d.channel || '').toLowerCase();
+          return ch === 'outbound';
+        });
 
         console.log(`SDR outbound deals: ${sdrOutboundDeals.length}`);
 
-        for (const deal of sdrOutboundDeals) {
-          const dealId = deal.id;
-          if (!dealId) continue;
+        // Collect AE owner IDs from those deals
+        const aeOwnerIds = new Set(
+          sdrOutboundDeals
+            .map((d: any) => d.hubspot_owner_id?.toString().trim().toLowerCase())
+            .filter((id: any) => id)
+        );
 
-          const assocResp = await fetch(
-            `https://api.hubapi.com/crm/v4/objects/deals/${dealId}/associations/meetings`,
-            { headers: { Authorization: `Bearer ${hubspotToken}` } }
-          );
+        console.log(`Unique AE owner IDs on SDR outbound deals: ${aeOwnerIds.size}`);
 
-          if (!assocResp.ok) continue;
-
-          const assocData = await assocResp.json();
-          const meetingIds = assocData.results?.map((r: any) => r.toObjectId) || [];
-
-          for (const meetingId of meetingIds) {
-            const mtResp = await fetch(
-              `https://api.hubapi.com/crm/v3/objects/meetings/${meetingId}?properties=hs_meeting_start_time,hs_meeting_type,hs_meeting_outcome`,
-              { headers: { Authorization: `Bearer ${hubspotToken}` } }
-            );
-            if (!mtResp.ok) continue;
-
-            const mt = await mtResp.json();
-            const type = (mt.properties.hs_meeting_type ?? "").toLowerCase();
-            const outcome = (mt.properties.hs_meeting_outcome ?? "").toLowerCase();
-
-            const isSD = type.includes("sales") && type.includes("discovery");
-            const isCompleted = outcome === "completed";
-
-            if (isSD && isCompleted) {
-              const ts = parseInt(mt.properties.hs_meeting_start_time);
-              const dt = new Date(ts);
-              if (dt >= new Date(startDate) && dt <= new Date(endDate)) {
-                meetings.push({
-                  timestamp: dt.toISOString(),
-                  type: mt.properties.hs_meeting_type,
-                  outcome: mt.properties.hs_meeting_outcome,
-                  dealId,
-                });
-              }
-            }
+        // Step 3: Match meetings to SDR if meeting owner = AE owner on any SDR outbound deal
+        for (const meeting of qualifiedMeetings) {
+          const meetingOwnerId = meeting.properties.hubspot_owner_id?.toString().trim().toLowerCase();
+          if (meetingOwnerId && aeOwnerIds.has(meetingOwnerId)) {
+            const ts = parseInt(meeting.properties.hs_meeting_start_time);
+            meetings.push({
+              timestamp: new Date(ts).toISOString(),
+              type: meeting.properties.hs_meeting_type,
+              outcome: meeting.properties.hs_meeting_outcome,
+            });
           }
         }
 
