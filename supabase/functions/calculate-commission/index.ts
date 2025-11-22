@@ -211,8 +211,8 @@ serve(async (req) => {
     // Fetch meetings from HubSpot (for SDR and Marketing teams)
     let meetings: any[] = [];
     
-    if (isSDR) {
-      console.log(`Fetching SDR meetings for ${repName}...`);
+    if (isSDR || isMarketing) {
+      console.log(`Fetching meetings for ${repName} (${team})...`);
 
       try {
         // Step 1: Fetch ALL meetings in date range that are "sales discovery meeting" + "completed"
@@ -241,7 +241,7 @@ serve(async (req) => {
                   ],
                 },
               ],
-              properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome', 'hubspot_owner_id'],
+              properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome'],
               limit: 1000,
             }),
           }
@@ -259,28 +259,58 @@ serve(async (req) => {
 
         console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
 
-        // Step 2: Find all outbound deals where this SDR is attributed
-        const sdrOutboundDeals = allDeals.filter((d: any) => {
-          if (!d.assignedTo.includes('SDR')) return false;
-          const ch = (d.channel || '').toLowerCase();
-          return ch === 'outbound';
-        });
-
-        console.log(`SDR outbound deals: ${sdrOutboundDeals.length}`);
-
-        // Collect AE owner IDs from those deals
-        const aeOwnerIds = new Set(
-          sdrOutboundDeals
-            .map((d: any) => d.hubspot_owner_id?.toString().trim().toLowerCase())
-            .filter((id: any) => id)
-        );
-
-        console.log(`Unique AE owner IDs on SDR outbound deals: ${aeOwnerIds.size}`);
-
-        // Step 3: Match meetings to SDR if meeting owner = AE owner on any SDR outbound deal
+        // Step 2: For each meeting, get associated deals and check sdr_owner
         for (const meeting of qualifiedMeetings) {
-          const meetingOwnerId = meeting.properties.hubspot_owner_id?.toString().trim().toLowerCase();
-          if (meetingOwnerId && aeOwnerIds.has(meetingOwnerId)) {
+          const meetingId = meeting.id;
+          
+          // Get associated deals for this meeting
+          const dealsAssocResp = await fetch(
+            `https://api.hubapi.com/crm/v4/objects/meetings/${meetingId}/associations/deals`,
+            { headers: { Authorization: `Bearer ${hubspotToken}` } }
+          );
+
+          if (!dealsAssocResp.ok) continue;
+
+          const dealsAssocData = await dealsAssocResp.json();
+          const dealIds = dealsAssocData.results?.map((r: any) => r.toObjectId) || [];
+
+          if (dealIds.length === 0) continue;
+
+          // Step 3: Check sdr_owner on each associated deal
+          let assignedToRep = false;
+
+          for (const dealId of dealIds) {
+            const dealResp = await fetch(
+              `https://api.hubapi.com/crm/v3/objects/deals/${dealId}?properties=sdr_owner,sdr_sde`,
+              { headers: { Authorization: `Bearer ${hubspotToken}` } }
+            );
+
+            if (!dealResp.ok) continue;
+
+            const dealData = await dealResp.json();
+            const sdrOwner = (dealData.properties.sdr_owner ?? dealData.properties.sdr_sde ?? "").toString().trim();
+
+            // Step 4: Attribution logic
+            if (isSDR && sdrOwner) {
+              // Check if this SDR matches
+              const sdr = sdrOwner.toLowerCase();
+              const matchesId = normalizedRepId && (sdr === normalizedRepId || sdr.includes(normalizedRepId));
+              const matchesEmail = normalizedEmail && (sdr === normalizedEmail || sdr.includes(normalizedEmail));
+              const matchesName = normalizedFullName && (sdr === normalizedFullName || sdr.includes(normalizedFullName));
+              
+              if (matchesId || matchesEmail || matchesName) {
+                assignedToRep = true;
+                break;
+              }
+            } else if (isMarketing && !sdrOwner) {
+              // Marketing gets credit when sdr_owner is empty
+              assignedToRep = true;
+              break;
+            }
+          }
+
+          // Add meeting to this rep's list if assigned
+          if (assignedToRep) {
             const ts = parseInt(meeting.properties.hs_meeting_start_time);
             meetings.push({
               timestamp: new Date(ts).toISOString(),
@@ -290,70 +320,9 @@ serve(async (req) => {
           }
         }
 
-        console.log(`Total SDR meetings counted: ${meetings.length}`);
+        console.log(`Total meetings counted for ${repName}: ${meetings.length}`);
       } catch (err) {
-        console.error("SDR meeting error:", err);
-      }
-    } else if (isMarketing) {
-      // Marketing fetches their own meetings
-      console.log(`Fetching Marketing meetings for ${repName}...`);
-      
-      try {
-        const meetingsResponse = await fetch(
-          `https://api.hubapi.com/crm/v3/objects/meetings/search`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${hubspotToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filterGroups: [
-                {
-                  filters: [
-                    {
-                      propertyName: 'hubspot_owner_id',
-                      operator: 'EQ',
-                      value: repId,
-                    },
-                    {
-                      propertyName: 'hs_meeting_start_time',
-                      operator: 'GTE',
-                      value: new Date(startDate).getTime(),
-                    },
-                    {
-                      propertyName: 'hs_meeting_start_time',
-                      operator: 'LTE',
-                      value: new Date(endDate).getTime(),
-                    },
-                  ],
-                },
-              ],
-              properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome'],
-              limit: 1000,
-            }),
-          }
-        );
-
-        const meetingsData = await meetingsResponse.json();
-        console.log(`Fetched ${meetingsData.results?.length || 0} raw meetings for ${repName}`);
-        
-        // Filter for "sales discovery meeting" type with "completed" outcome
-        meetings = (meetingsData.results || [])
-          .filter((m: any) => {
-            const meetingType = m.properties.hs_meeting_type?.toLowerCase() || '';
-            const outcome = m.properties.hs_meeting_outcome?.toLowerCase() || '';
-            return meetingType.includes('sales discovery meeting') && outcome === 'completed';
-          })
-          .map((m: any) => ({
-            timestamp: new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString(),
-            type: m.properties.hs_meeting_type,
-            outcome: m.properties.hs_meeting_outcome,
-          }));
-        
-        console.log(`Marketing meetings: ${meetings.length} qualifying meetings`);
-      } catch (error) {
-        console.error('Error fetching Marketing meetings:', error);
+        console.error("Meeting attribution error:", err);
       }
     }
 
