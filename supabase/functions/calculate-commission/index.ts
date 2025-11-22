@@ -161,7 +161,7 @@ serve(async (req) => {
       }
       
       // C) Marketing attribution: inbound channel with no SDR
-      if (isMarketing && !normalized.sdr && normalized.channel === 'inbound') {
+      if (isMarketing && !normalized.sdr && (normalized.channel === 'inbound' || normalized.channel.includes('inbound'))) {
         deal.assignedTo.push('Marketing');
       }
     });
