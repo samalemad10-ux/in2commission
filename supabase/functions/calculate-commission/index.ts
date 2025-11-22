@@ -150,9 +150,25 @@ serve(async (req) => {
         sdr: deal.sdr_sde?.toString().trim().toLowerCase() || '',
       };
       
-      // A) SDR attribution: sdr_sde matches rep ID (it's an owner ID, not a name)
-      if (normalized.sdr === normalizedRepId) {
-        deal.assignedTo.push('SDR');
+      // A) SDR attribution: sdr_sde matches this SDR (by id, email, or name)
+      if (normalized.sdr) {
+        const sdrValue = normalized.sdr; // already lowercased/trimmed
+
+        const matchesId =
+          normalizedRepId &&
+          (sdrValue === normalizedRepId || sdrValue.includes(normalizedRepId));
+
+        const matchesEmail =
+          normalizedEmail &&
+          (sdrValue === normalizedEmail || sdrValue.includes(normalizedEmail));
+
+        const matchesName =
+          normalizedFullName &&
+          (sdrValue === normalizedFullName || sdrValue.includes(normalizedFullName));
+
+        if (matchesId || matchesEmail || matchesName) {
+          deal.assignedTo.push("SDR");
+        }
       }
       
       // B) AE attribution: hubspot_owner_id matches rep ID
