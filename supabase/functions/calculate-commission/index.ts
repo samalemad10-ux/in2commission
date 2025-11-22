@@ -92,7 +92,7 @@ serve(async (req) => {
             filters: dealFilters,
           },
         ],
-        properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'deal_channel', 'payment_terms', 'sdr_sde'],
+        properties: ['amount', 'closedate', 'dealstage', 'hubspot_owner_id', 'channel', 'payment_terms', 'sdr_sde'],
         limit: 100,
       }),
     });
@@ -122,7 +122,7 @@ serve(async (req) => {
       dealstage: d.properties.dealstage,
       hubspot_owner_id: d.properties.hubspot_owner_id,
       sdr_sde: d.properties.sdr_sde,
-      deal_channel: d.properties.deal_channel,
+      channel: d.properties.channel,
       payment_terms: d.properties.payment_terms,
       assignedTo: [] as string[], // Will hold ["AE"], ["SDR"], ["Marketing"], or combinations
     })) || [];
@@ -138,7 +138,7 @@ serve(async (req) => {
     allDeals.forEach((deal: any) => {
       const normalized = {
         ownerId: deal.hubspot_owner_id?.toString().trim().toLowerCase() || '',
-        channel: deal.deal_channel?.toString().trim().toLowerCase() || '',
+        channel: deal.channel?.toString().trim().toLowerCase() || '',
         sdr: deal.sdr_sde?.toString().trim().toLowerCase() || '',
       };
       
@@ -178,8 +178,8 @@ serve(async (req) => {
     let meetings: any[] = [];
     if (isSDR || isMarketing) {
       // Check if rep has deals with the appropriate channel
-      const hasInboundDeals = deals.some(d => d.deal_channel?.toLowerCase() === 'inbound');
-      const hasOutboundDeals = deals.some(d => d.deal_channel?.toLowerCase() === 'outbound');
+      const hasInboundDeals = deals.some(d => d.channel?.toLowerCase() === 'inbound');
+      const hasOutboundDeals = deals.some(d => d.channel?.toLowerCase() === 'outbound');
       
       const shouldFetchMeetings = (isMarketing && hasInboundDeals) || (isSDR && hasOutboundDeals);
       
@@ -384,7 +384,7 @@ function calculateCommission(
 
     dealCommission = adjustedRevenue * (settings.sdr_closed_won_percent / 100);
   } else if (isMarketing && !settings.marketing_same_as_sdr) {
-    const inboundDeals = closedWonDeals.filter(d => d.deal_channel?.toLowerCase() === 'inbound');
+    const inboundDeals = closedWonDeals.filter(d => d.channel?.toLowerCase() === 'inbound');
     const inboundRevenue = inboundDeals.reduce((sum, deal) => sum + deal.amount, 0);
     
     // Apply multiplier to inbound revenue
