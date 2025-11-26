@@ -215,6 +215,22 @@ serve(async (req) => {
       console.log(`Fetching meetings for ${repName} (${team})...`);
 
       try {
+        // First, fetch meeting properties to find the correct field names
+        const propsResponse = await fetch('https://api.hubapi.com/crm/v3/properties/meetings', {
+          headers: { 'Authorization': `Bearer ${hubspotToken}` },
+        });
+        
+        if (propsResponse.ok) {
+          const propsData = await propsResponse.json();
+          const allPropNames = propsData.results.map((p: any) => p.name);
+          console.log('All available meeting properties:', allPropNames.join(', '));
+          
+          const typeProps = propsData.results.filter((p: any) => 
+            p.name.toLowerCase().includes('type') || p.label?.toLowerCase().includes('type')
+          );
+          console.log('Type-related properties:', JSON.stringify(typeProps.map((p: any) => ({ name: p.name, label: p.label })), null, 2));
+        }
+        
         // Step 1: Fetch ALL meetings in date range with pagination (HubSpot limit: 200)
         const allMeetingsResults: any[] = [];
         let after: string | undefined = undefined;
