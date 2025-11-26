@@ -215,53 +215,60 @@ serve(async (req) => {
       console.log(`Fetching meetings for ${repName} (${team})...`);
 
       try {
-        // Step 1: Fetch ALL meetings in date range that are "sales discovery meeting" + "completed"
-        const meetingsResponse = await fetch(
-          `https://api.hubapi.com/crm/v3/objects/meetings/search`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${hubspotToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filterGroups: [
-                {
-                  filters: [
-                    {
-                      propertyName: 'hs_meeting_start_time',
-                      operator: 'GTE',
-                      value: new Date(startDate).getTime(),
-                    },
-                    {
-                      propertyName: 'hs_meeting_start_time',
-                      operator: 'LTE',
-                      value: new Date(endDate).getTime(),
-                    },
-                  ],
-                },
-              ],
-              properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome'],
-              limit: 1000,
-            }),
-          }
-        );
+        // Step 1: Fetch ALL meetings in date range with pagination (HubSpot limit: 200)
+        const allMeetingsResults: any[] = [];
+        let after: string | undefined = undefined;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const meetingsResponse: Response = await fetch(
+            `https://api.hubapi.com/crm/v3/objects/meetings/search`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${hubspotToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filterGroups: [
+                  {
+                    filters: [
+                      {
+                        propertyName: 'hs_meeting_start_time',
+                        operator: 'GTE',
+                        value: new Date(startDate).getTime(),
+                      },
+                      {
+                        propertyName: 'hs_meeting_start_time',
+                        operator: 'LTE',
+                        value: new Date(endDate).getTime(),
+                      },
+                    ],
+                  },
+                ],
+                properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome'],
+                limit: 200,
+                ...(after && { after }),
+              }),
+            }
+          );
 
-        const meetingsData = await meetingsResponse.json();
-        
-        // Log full response for debugging
-        console.log('HubSpot meetings API response status:', meetingsResponse.status);
-        console.log('HubSpot meetings API response:', JSON.stringify(meetingsData, null, 2));
-        
-        if (!meetingsResponse.ok) {
-          console.error('HubSpot meetings API error:', meetingsData);
-          throw new Error(`HubSpot meetings API failed: ${meetingsData.message || 'Unknown error'}`);
+          const meetingsData: any = await meetingsResponse.json();
+          
+          if (!meetingsResponse.ok) {
+            console.error('HubSpot meetings API error:', meetingsData);
+            throw new Error(`HubSpot meetings API failed: ${meetingsData.message || 'Unknown error'}`);
+          }
+          
+          allMeetingsResults.push(...(meetingsData.results || []));
+          after = meetingsData.paging?.next?.after;
+          hasMore = !!after;
         }
         
-        console.log(`Fetched ${meetingsData.results?.length || 0} raw meetings in date range`);
+        console.log(`Fetched ${allMeetingsResults.length} total raw meetings in date range`);
 
         // Filter for sales discovery + completed
-        const qualifiedMeetings = (meetingsData.results || []).filter((m: any) => {
+        const qualifiedMeetings = allMeetingsResults.filter((m: any) => {
           const meetingType = m.properties.hs_meeting_type?.toLowerCase() || '';
           const outcome = m.properties.hs_meeting_outcome?.toLowerCase() || '';
           return meetingType.includes('sales') && meetingType.includes('discovery') && outcome === 'completed';
