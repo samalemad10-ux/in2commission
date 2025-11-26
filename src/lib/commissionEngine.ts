@@ -4,7 +4,7 @@ export interface CommissionSettings {
   ae_brackets: { min: number; max: number | null; percent: number }[];
   ae_payment_term_bonuses: { term: string; bonus_percent: number }[];
   ae_revenue_multiplier_brackets: { min: number; max: number | null; multiplier: number }[];
-  sdr_meeting_tiers: { min: number; max: number | null; bonus_amount: number }[];
+  sdr_meeting_tiers: { min: number; max: number | null; rate_per_meeting: number }[];
   sdr_closed_won_percent: number;
   sdr_revenue_multiplier_brackets: { min: number; max: number | null; multiplier: number }[];
   marketing_same_as_sdr: boolean;
@@ -129,18 +129,19 @@ export function calculateCommission(
       weeklyMeetings[weekNum].push(meeting);
     });
 
-    // Calculate weekly bonuses
+    // Calculate weekly bonuses using multiplier
     Object.entries(weeklyMeetings).forEach(([week, weekMeetings]) => {
       const meetingCount = weekMeetings.length;
       const tier = settings.sdr_meeting_tiers.find(t => 
         meetingCount >= t.min && (t.max === null || meetingCount < t.max)
       );
       if (tier) {
-        meetingBonus += tier.bonus_amount;
+        const weekBonus = meetingCount * tier.rate_per_meeting;
+        meetingBonus += weekBonus;
         weeklyBreakdown.push({
           week: parseInt(week),
           meetings: meetingCount,
-          bonus: tier.bonus_amount
+          bonus: weekBonus
         });
       }
     });
