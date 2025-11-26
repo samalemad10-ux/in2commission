@@ -290,6 +290,8 @@ serve(async (req) => {
             console.log(`  Meeting ${i + 1}:`, {
               type: m.properties.hs_activity_type,
               outcome: m.properties.hs_meeting_outcome,
+              rawStartTime: m.properties.hs_meeting_start_time,
+              parsedDate: new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString(),
             });
           });
           
@@ -307,7 +309,7 @@ serve(async (req) => {
           const matches = meetingType.includes('sales') && meetingType.includes('discovery') && outcome === 'completed';
           
           if (matches) {
-            console.log(`Matched meeting: type="${m.properties.hs_activity_type}", outcome="${m.properties.hs_meeting_outcome}", time="${new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString()}"`);
+            console.log(`Matched meeting: type="${m.properties.hs_activity_type}", outcome="${m.properties.hs_meeting_outcome}", rawTime="${m.properties.hs_meeting_start_time}", parsedTime="${new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString()}"`);
           }
           
           return matches;
