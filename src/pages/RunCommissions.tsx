@@ -217,25 +217,25 @@ export default function RunCommissions() {
                   <div>
                     <p className="text-sm text-muted-foreground">Total Revenue</p>
                     <p className="text-2xl font-bold text-foreground">
-                      ${results.totalRevenue.toLocaleString()}
+                      ${(results.totalRevenue ?? 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Commission</p>
                     <p className="text-2xl font-bold text-success">
-                      ${results.totalCommission.toLocaleString()}
+                      ${(results.totalCommission ?? 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Deal Commission</p>
                     <p className="text-2xl font-bold text-foreground">
-                      ${results.dealCommission.toLocaleString()}
+                      ${(results.dealCommission ?? 0).toLocaleString()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Meeting Bonus</p>
                     <p className="text-2xl font-bold text-accent">
-                      ${results.meetingBonus.toLocaleString()}
+                      ${(results.meetingBonus ?? 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
