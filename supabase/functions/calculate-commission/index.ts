@@ -309,7 +309,8 @@ serve(async (req) => {
           const matches = meetingType.includes('sales') && meetingType.includes('discovery') && outcome === 'completed';
           
           if (matches) {
-            console.log(`Matched meeting: type="${m.properties.hs_activity_type}", outcome="${m.properties.hs_meeting_outcome}", rawTime="${m.properties.hs_meeting_start_time}", parsedTime="${new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString()}"`);
+            const meetingDate = new Date(m.properties.hs_meeting_start_time);
+            console.log(`Matched meeting: type="${m.properties.hs_activity_type}", outcome="${m.properties.hs_meeting_outcome}", date="${meetingDate.toISOString()}"`);
           }
           
           return matches;
@@ -369,8 +370,7 @@ serve(async (req) => {
 
           // Add meeting to this rep's list if assigned
           if (assignedToRep) {
-            const ts = parseInt(meeting.properties.hs_meeting_start_time);
-            const meetingDate = new Date(ts);
+            const meetingDate = new Date(meeting.properties.hs_meeting_start_time);
             const weekNum = getISOWeek(meetingDate);
             
             console.log(`Attributed meeting to ${repName}: week ${weekNum}, date=${meetingDate.toISOString()}`);
