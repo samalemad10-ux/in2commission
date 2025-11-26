@@ -304,7 +304,13 @@ serve(async (req) => {
         const qualifiedMeetings = allMeetingsResults.filter((m: any) => {
           const meetingType = m.properties.hs_activity_type?.toLowerCase() || '';
           const outcome = m.properties.hs_meeting_outcome?.toLowerCase() || '';
-          return meetingType.includes('sales') && meetingType.includes('discovery') && outcome === 'completed';
+          const matches = meetingType.includes('sales') && meetingType.includes('discovery') && outcome === 'completed';
+          
+          if (matches) {
+            console.log(`Matched meeting: type="${m.properties.hs_activity_type}", outcome="${m.properties.hs_meeting_outcome}", time="${new Date(parseInt(m.properties.hs_meeting_start_time)).toISOString()}"`);
+          }
+          
+          return matches;
         });
 
         console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
@@ -362,8 +368,13 @@ serve(async (req) => {
           // Add meeting to this rep's list if assigned
           if (assignedToRep) {
             const ts = parseInt(meeting.properties.hs_meeting_start_time);
+            const meetingDate = new Date(ts);
+            const weekNum = getISOWeek(meetingDate);
+            
+            console.log(`Attributed meeting to ${repName}: week ${weekNum}, date=${meetingDate.toISOString()}`);
+            
             meetings.push({
-              timestamp: new Date(ts).toISOString(),
+              timestamp: meetingDate.toISOString(),
               type: meeting.properties.hs_activity_type,
               outcome: meeting.properties.hs_meeting_outcome,
             });
@@ -371,6 +382,14 @@ serve(async (req) => {
         }
 
         console.log(`Total meetings counted for ${repName}: ${meetings.length}`);
+        
+        // Log weekly distribution
+        const weekDistribution: Record<number, number> = {};
+        meetings.forEach(m => {
+          const weekNum = getISOWeek(new Date(m.timestamp));
+          weekDistribution[weekNum] = (weekDistribution[weekNum] || 0) + 1;
+        });
+        console.log(`Weekly meeting distribution for ${repName}:`, JSON.stringify(weekDistribution));
       } catch (err) {
         console.error("Meeting attribution error:", err);
       }
