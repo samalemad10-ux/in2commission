@@ -262,7 +262,7 @@ serve(async (req) => {
                     ],
                   },
                 ],
-                properties: ['hs_meeting_start_time', 'hs_meeting_type', 'hs_meeting_outcome'],
+                properties: ['hs_meeting_start_time', 'hs_activity_type', 'hs_meeting_outcome'],
                 limit: 200,
                 ...(after && { after }),
               }),
@@ -288,13 +288,13 @@ serve(async (req) => {
           console.log('Sample meetings (first 5):');
           allMeetingsResults.slice(0, 5).forEach((m: any, i: number) => {
             console.log(`  Meeting ${i + 1}:`, {
-              type: m.properties.hs_meeting_type,
+              type: m.properties.hs_activity_type,
               outcome: m.properties.hs_meeting_outcome,
             });
           });
           
           // Get unique meeting types and outcomes
-          const types = new Set(allMeetingsResults.map((m: any) => m.properties.hs_meeting_type || 'NULL'));
+          const types = new Set(allMeetingsResults.map((m: any) => m.properties.hs_activity_type || 'NULL'));
           const outcomes = new Set(allMeetingsResults.map((m: any) => m.properties.hs_meeting_outcome || 'NULL'));
           console.log('All unique meeting types:', Array.from(types).join(', '));
           console.log('All unique meeting outcomes:', Array.from(outcomes).join(', '));
@@ -302,7 +302,7 @@ serve(async (req) => {
 
         // Filter for sales discovery + completed
         const qualifiedMeetings = allMeetingsResults.filter((m: any) => {
-          const meetingType = m.properties.hs_meeting_type?.toLowerCase() || '';
+          const meetingType = m.properties.hs_activity_type?.toLowerCase() || '';
           const outcome = m.properties.hs_meeting_outcome?.toLowerCase() || '';
           return meetingType.includes('sales') && meetingType.includes('discovery') && outcome === 'completed';
         });
@@ -364,7 +364,7 @@ serve(async (req) => {
             const ts = parseInt(meeting.properties.hs_meeting_start_time);
             meetings.push({
               timestamp: new Date(ts).toISOString(),
-              type: meeting.properties.hs_meeting_type,
+              type: meeting.properties.hs_activity_type,
               outcome: meeting.properties.hs_meeting_outcome,
             });
           }
