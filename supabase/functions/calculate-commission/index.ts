@@ -248,6 +248,16 @@ serve(async (req) => {
         );
 
         const meetingsData = await meetingsResponse.json();
+        
+        // Log full response for debugging
+        console.log('HubSpot meetings API response status:', meetingsResponse.status);
+        console.log('HubSpot meetings API response:', JSON.stringify(meetingsData, null, 2));
+        
+        if (!meetingsResponse.ok) {
+          console.error('HubSpot meetings API error:', meetingsData);
+          throw new Error(`HubSpot meetings API failed: ${meetingsData.message || 'Unknown error'}`);
+        }
+        
         console.log(`Fetched ${meetingsData.results?.length || 0} raw meetings in date range`);
 
         // Filter for sales discovery + completed
