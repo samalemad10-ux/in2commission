@@ -266,6 +266,23 @@ serve(async (req) => {
         }
         
         console.log(`Fetched ${allMeetingsResults.length} total raw meetings in date range`);
+        
+        // Log sample meeting types and outcomes for debugging
+        if (allMeetingsResults.length > 0) {
+          console.log('Sample meetings (first 5):');
+          allMeetingsResults.slice(0, 5).forEach((m: any, i: number) => {
+            console.log(`  Meeting ${i + 1}:`, {
+              type: m.properties.hs_meeting_type,
+              outcome: m.properties.hs_meeting_outcome,
+            });
+          });
+          
+          // Get unique meeting types and outcomes
+          const types = new Set(allMeetingsResults.map((m: any) => m.properties.hs_meeting_type || 'NULL'));
+          const outcomes = new Set(allMeetingsResults.map((m: any) => m.properties.hs_meeting_outcome || 'NULL'));
+          console.log('All unique meeting types:', Array.from(types).join(', '));
+          console.log('All unique meeting outcomes:', Array.from(outcomes).join(', '));
+        }
 
         // Filter for sales discovery + completed
         const qualifiedMeetings = allMeetingsResults.filter((m: any) => {
