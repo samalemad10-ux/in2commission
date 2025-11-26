@@ -531,8 +531,9 @@ function calculateCommission(
         meetingCount >= t.min && (t.max === null || meetingCount < t.max)
       );
       if (tier) {
-        meetingBonus += tier.bonus_amount;
-        weeklyBreakdown.push({ week: parseInt(week), meetings: meetingCount, bonus: tier.bonus_amount });
+        const weekBonus = meetingCount * tier.rate_per_meeting;
+        meetingBonus += weekBonus;
+        weeklyBreakdown.push({ week: parseInt(week), meetings: meetingCount, bonus: weekBonus });
       }
     });
 
