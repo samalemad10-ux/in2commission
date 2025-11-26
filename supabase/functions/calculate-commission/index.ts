@@ -517,12 +517,17 @@ function calculateCommission(
       }
     });
   } else if (isSDR || (isMarketing && settings.marketing_same_as_sdr)) {
+    const periodStartDate = new Date(startDate);
+    const periodStartWeek = getISOWeek(periodStartDate);
+    
     const weeklyMeetings: Record<number, any[]> = {};
     meetings.forEach(meeting => {
       const date = new Date(meeting.timestamp);
-      const weekNum = getISOWeek(date);
-      if (!weeklyMeetings[weekNum]) weeklyMeetings[weekNum] = [];
-      weeklyMeetings[weekNum].push(meeting);
+      const isoWeek = getISOWeek(date);
+      // Calculate relative week number (1-indexed)
+      const relativeWeek = isoWeek - periodStartWeek + 1;
+      if (!weeklyMeetings[relativeWeek]) weeklyMeetings[relativeWeek] = [];
+      weeklyMeetings[relativeWeek].push(meeting);
     });
 
     Object.entries(weeklyMeetings).forEach(([week, weekMeetings]) => {

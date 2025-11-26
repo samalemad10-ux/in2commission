@@ -47,7 +47,8 @@ export function calculateCommission(
   team: 'AE' | 'SDR' | 'Marketing',
   deals: Deal[],
   meetings: Meeting[],
-  settings: CommissionSettings
+  settings: CommissionSettings,
+  periodStart?: string
 ): CommissionResult {
   let totalRevenue = 0;
   let dealCommission = 0;
@@ -118,15 +119,20 @@ export function calculateCommission(
   } else if (team === 'SDR' || (team === 'Marketing' && settings.marketing_same_as_sdr)) {
     // SDR Logic or Marketing using SDR logic
     
-    // Group meetings by ISO week
+    // Group meetings by relative week within the period
+    const periodStartDate = periodStart ? new Date(periodStart) : new Date();
+    const periodStartWeek = getISOWeek(periodStartDate);
+    
     const weeklyMeetings: Record<number, Meeting[]> = {};
     meetings.forEach(meeting => {
       const date = new Date(meeting.timestamp);
-      const weekNum = getISOWeek(date);
-      if (!weeklyMeetings[weekNum]) {
-        weeklyMeetings[weekNum] = [];
+      const isoWeek = getISOWeek(date);
+      // Calculate relative week number (1-indexed)
+      const relativeWeek = isoWeek - periodStartWeek + 1;
+      if (!weeklyMeetings[relativeWeek]) {
+        weeklyMeetings[relativeWeek] = [];
       }
-      weeklyMeetings[weekNum].push(meeting);
+      weeklyMeetings[relativeWeek].push(meeting);
     });
 
     // Calculate weekly bonuses using multiplier
