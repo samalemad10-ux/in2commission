@@ -23,6 +23,10 @@ export interface Deal {
 
 export interface Meeting {
   timestamp: string;
+  activity?: {
+    type?: string;
+  };
+  status?: string;
 }
 
 export interface CommissionResult {
@@ -119,45 +123,58 @@ export function calculateCommission(
   } else if (team === 'SDR' || (team === 'Marketing' && settings.marketing_same_as_sdr)) {
     // SDR Logic or Marketing using SDR logic
     
-    // Group meetings by relative week within the period
-    const periodStartDate = periodStart ? new Date(periodStart) : new Date();
-    const periodStartWeek = getISOWeek(periodStartDate);
-    
-    const weeklyMeetings: Record<number, Meeting[]> = {};
-    meetings.forEach(meeting => {
-      const date = new Date(meeting.timestamp);
-      const isoWeek = getISOWeek(date);
-      // Calculate relative week number (1-indexed)
-      const relativeWeek = isoWeek - periodStartWeek + 1;
-      if (!weeklyMeetings[relativeWeek]) {
-        weeklyMeetings[relativeWeek] = [];
-      }
-      weeklyMeetings[relativeWeek].push(meeting);
+    // Filter meetings first - only completed discovery meetings
+    const filteredMeetings = meetings.filter(m => {
+      const isCompleted = m.status?.toLowerCase() === "completed";
+      const isDiscovery =
+        m.activity?.type?.toLowerCase().includes("sales discovery") ||
+        m.activity?.type?.toLowerCase().includes("discovery");
+      return isCompleted && isDiscovery;
     });
 
-    // Calculate weekly bonuses using multiplier
-    Object.entries(weeklyMeetings).forEach(([week, weekMeetings]) => {
-      const meetingCount = weekMeetings.length;
-      const tier = settings.sdr_meeting_tiers.find(t => 
-        meetingCount >= t.min && (t.max === null || meetingCount < t.max)
-      );
-      if (tier) {
-        const weekBonus = meetingCount * tier.bonus_amount;
-        meetingBonus += weekBonus;
-        
-        // Calculate month name for the week
-        const weekStartDate = new Date(periodStartDate);
-        weekStartDate.setDate(periodStartDate.getDate() + (parseInt(week) - 1) * 7);
-        const monthName = weekStartDate.toLocaleString('en-US', { month: 'long' });
-        const weekLabel = `${monthName} Week ${week}`;
-        
-        weeklyBreakdown.push({
-          week: parseInt(week),
-          weekLabel,
-          meetings: meetingCount,
-          bonus: weekBonus
-        });
+    // Count only valid meetings
+    totalMeetings = filteredMeetings.length;
+
+    // Group meetings by real week start (Monday)
+    const weeklyMeetings: Record<string, Meeting[]> = {};
+
+    filteredMeetings.forEach(meeting => {
+      const date = new Date(meeting.timestamp);
+      const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+
+      if (!weeklyMeetings[weekKey]) {
+        weeklyMeetings[weekKey] = [];
       }
+      weeklyMeetings[weekKey].push(meeting);
+    });
+
+    // Calculate weekly bonuses
+    Object.entries(weeklyMeetings).forEach(([weekKey, weekMeetings]) => {
+      const meetingCount = weekMeetings.length;
+
+      const tier = settings.sdr_meeting_tiers.find(t =>
+        meetingCount >= t.min && (t.max === null || meetingCount <= t.max)
+      );
+
+      let weekBonus = 0;
+      if (tier) {
+        weekBonus = meetingCount * tier.bonus_amount;
+        meetingBonus += weekBonus;
+      }
+
+      // Month & week label logic
+      const weekStartDate = new Date(weekKey);
+      const monthName = format(weekStartDate, "MMMM");
+      const weekNumber = Math.floor((weekStartDate.getDate() - 1) / 7) + 1;
+      const weekLabel = `${monthName} Week ${weekNumber}`;
+
+      weeklyBreakdown.push({
+        week: weekNumber,
+        weekLabel,
+        meetings: meetingCount,
+        bonus: weekBonus
+      });
     });
 
     // Monthly closed won bonus (use adjusted revenue)
