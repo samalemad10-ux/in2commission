@@ -271,25 +271,33 @@ export default function RunCommissions() {
                 )}
 
                 {results.debugMeetings && results.debugMeetings.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-3">Debug: Meetings Used</h3>
-                    <div className="space-y-4">
-                      {results.debugMeetings.map((m: any, i: number) => (
-                        <div key={i} className="border rounded-lg p-4 bg-muted/50">
-                          <p className="font-bold">{m.meetingName}</p>
-                          <p className="text-sm text-muted-foreground">{m.timestamp}</p>
-                          <p className="text-sm">Type: {m.activityType}</p>
-                          <p className="text-sm">Status: {m.status}</p>
-                          <p className="text-sm">Deal: {m.dealName || 'N/A'}</p>
-                          <details className="mt-2">
-                            <summary className="cursor-pointer text-sm text-primary">View All Properties</summary>
-                            <pre className="mt-2 text-xs overflow-auto bg-background p-2 rounded">
-                              {JSON.stringify(m.allProperties, null, 2)}
-                            </pre>
-                          </details>
-                        </div>
-                      ))}
-                    </div>
+                  <div style={{ marginTop: "24px" }}>
+                    <h3>Meetings Used in Calculation</h3>
+
+                    {results.debugMeetings.map((m: any, i: number) => (
+                      <div 
+                        key={i} 
+                        style={{ 
+                          border: "1px solid #ddd", 
+                          borderRadius: "6px",
+                          padding: "12px", 
+                          marginBottom: "12px"
+                        }}
+                      >
+                        <p><strong>Name:</strong> {m.meetingName}</p>
+                        <p><strong>Timestamp:</strong> {m.timestamp}</p>
+                        <p><strong>Activity Type:</strong> {m.activityType}</p>
+                        <p><strong>Status:</strong> {m.status}</p>
+                        <p><strong>Deal:</strong> {m.dealName ?? "(none)"}</p>
+
+                        <details style={{ marginTop: "10px" }}>
+                          <summary>Show All Properties</summary>
+                          <pre style={{ whiteSpace: "pre-wrap", fontSize: "12px" }}>
+                            {JSON.stringify(m.allProperties, null, 2)}
+                          </pre>
+                        </details>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
