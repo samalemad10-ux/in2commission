@@ -530,17 +530,28 @@ function calculateCommission(
       weeklyMeetings[relativeWeek].push(meeting);
     });
 
+    console.log('SDR Meeting Tiers:', JSON.stringify(settings.sdr_meeting_tiers));
+    
     Object.entries(weeklyMeetings).forEach(([week, weekMeetings]) => {
       const meetingCount = weekMeetings.length;
+      console.log(`Week ${week}: ${meetingCount} meetings`);
+      
       const tier = settings.sdr_meeting_tiers.find((t: any) => 
         meetingCount >= t.min && (t.max === null || meetingCount < t.max)
       );
+      
+      console.log(`Found tier for week ${week}:`, tier ? JSON.stringify(tier) : 'NO TIER FOUND');
+      
       if (tier) {
         const weekBonus = meetingCount * tier.rate_per_meeting;
+        console.log(`Week ${week} bonus calculation: ${meetingCount} × ${tier.rate_per_meeting} = ${weekBonus}`);
         meetingBonus += weekBonus;
         weeklyBreakdown.push({ week: parseInt(week), meetings: meetingCount, bonus: weekBonus });
       }
     });
+    
+    console.log('Total meeting bonus:', meetingBonus);
+    console.log('Weekly breakdown:', JSON.stringify(weeklyBreakdown));
 
     dealCommission = adjustedRevenue * (settings.sdr_closed_won_percent / 100);
   } else if (isMarketing && !settings.marketing_same_as_sdr) {
