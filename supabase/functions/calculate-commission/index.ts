@@ -319,6 +319,17 @@ serve(async (req) => {
 
         console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
 
+        // DEBUG: Log meetings Lovable is actually using
+        const debugMeetings = qualifiedMeetings.map(m => ({
+          timestamp: new Date(m.properties.hs_meeting_start_time).toISOString(),
+          meetingName: m.properties.hs_meeting_title || m.properties.hs_meeting_body || "(no name)",
+          activityType: m.properties.hs_activity_type,
+          status: m.properties.hs_meeting_outcome,
+          allProperties: m.properties
+        }));
+        
+        console.log("DEBUG — Meetings used for commission:", JSON.stringify(debugMeetings, null, 2));
+
         // Step 2: For each meeting, get associated deals and check sdr_owner
         for (const meeting of qualifiedMeetings) {
           const meetingId = meeting.id;
