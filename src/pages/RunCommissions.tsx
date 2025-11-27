@@ -260,9 +260,9 @@ export default function RunCommissions() {
                       <TableBody>
                         {results.weeklyBreakdown.map((week: any, idx: number) => (
                           <TableRow key={idx}>
-                            <TableCell>Week {week.week}</TableCell>
+                            <TableCell>{week.weekLabel || `Week ${week.week}`}</TableCell>
                             <TableCell>{week.meetings}</TableCell>
-                            <TableCell>${week.bonus}</TableCell>
+                            <TableCell>${week.bonus?.toLocaleString() ?? 0}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
