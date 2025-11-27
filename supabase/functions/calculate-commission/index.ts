@@ -543,10 +543,23 @@ function calculateCommission(
       console.log(`Found tier for week ${week}:`, tier ? JSON.stringify(tier) : 'NO TIER FOUND');
       
       if (tier) {
-        const weekBonus = meetingCount * tier.rate_per_meeting;
-        console.log(`Week ${week} bonus calculation: ${meetingCount} × ${tier.rate_per_meeting} = ${weekBonus}`);
+        const weekBonus = meetingCount * tier.bonus_amount;
+        console.log(`Week ${week} bonus calculation: ${meetingCount} × ${tier.bonus_amount} = ${weekBonus}`);
         meetingBonus += weekBonus;
-        weeklyBreakdown.push({ week: parseInt(week), meetings: meetingCount, bonus: weekBonus });
+        
+        // Calculate month name for the week
+        const periodStartDate = new Date(startDate);
+        const weekStartDate = new Date(periodStartDate);
+        weekStartDate.setDate(periodStartDate.getDate() + (parseInt(week) - 1) * 7);
+        const monthName = weekStartDate.toLocaleString('en-US', { month: 'long' });
+        const weekLabel = `${monthName} Week ${week}`;
+        
+        weeklyBreakdown.push({ 
+          week: parseInt(week), 
+          weekLabel,
+          meetings: meetingCount, 
+          bonus: weekBonus 
+        });
       }
     });
     

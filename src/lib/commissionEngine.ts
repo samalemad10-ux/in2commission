@@ -4,7 +4,7 @@ export interface CommissionSettings {
   ae_brackets: { min: number; max: number | null; percent: number }[];
   ae_payment_term_bonuses: { term: string; bonus_percent: number }[];
   ae_revenue_multiplier_brackets: { min: number; max: number | null; multiplier: number }[];
-  sdr_meeting_tiers: { min: number; max: number | null; rate_per_meeting: number }[];
+  sdr_meeting_tiers: { min: number; max: number | null; bonus_amount: number }[];
   sdr_closed_won_percent: number;
   sdr_revenue_multiplier_brackets: { min: number; max: number | null; multiplier: number }[];
   marketing_same_as_sdr: boolean;
@@ -36,7 +36,7 @@ export interface CommissionResult {
   dealCommission: number;
   meetingBonus: number;
   totalMeetings: number;
-  weeklyBreakdown?: { week: number; meetings: number; bonus: number }[];
+  weeklyBreakdown?: { week: number; weekLabel: string; meetings: number; bonus: number }[];
   usedBracketPercent?: number;
   usedPaymentTermBonuses?: { term: string; amount: number }[];
 }
@@ -54,7 +54,7 @@ export function calculateCommission(
   let dealCommission = 0;
   let meetingBonus = 0;
   let totalMeetings = meetings.length;
-  let weeklyBreakdown: { week: number; meetings: number; bonus: number }[] = [];
+  let weeklyBreakdown: { week: number; weekLabel: string; meetings: number; bonus: number }[] = [];
   let usedBracketPercent: number | undefined;
   let usedPaymentTermBonuses: { term: string; amount: number }[] = [];
 
@@ -142,10 +142,18 @@ export function calculateCommission(
         meetingCount >= t.min && (t.max === null || meetingCount < t.max)
       );
       if (tier) {
-        const weekBonus = meetingCount * tier.rate_per_meeting;
+        const weekBonus = meetingCount * tier.bonus_amount;
         meetingBonus += weekBonus;
+        
+        // Calculate month name for the week
+        const weekStartDate = new Date(periodStartDate);
+        weekStartDate.setDate(periodStartDate.getDate() + (parseInt(week) - 1) * 7);
+        const monthName = weekStartDate.toLocaleString('en-US', { month: 'long' });
+        const weekLabel = `${monthName} Week ${week}`;
+        
         weeklyBreakdown.push({
           week: parseInt(week),
+          weekLabel,
           meetings: meetingCount,
           bonus: weekBonus
         });
