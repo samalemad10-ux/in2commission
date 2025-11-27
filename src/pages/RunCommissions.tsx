@@ -269,6 +269,29 @@ export default function RunCommissions() {
                     </Table>
                   </div>
                 )}
+
+                {results.debugMeetings && results.debugMeetings.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-3">Debug: Meetings Used</h3>
+                    <div className="space-y-4">
+                      {results.debugMeetings.map((m: any, i: number) => (
+                        <div key={i} className="border rounded-lg p-4 bg-muted/50">
+                          <p className="font-bold">{m.meetingName}</p>
+                          <p className="text-sm text-muted-foreground">{m.timestamp}</p>
+                          <p className="text-sm">Type: {m.activityType}</p>
+                          <p className="text-sm">Status: {m.status}</p>
+                          <p className="text-sm">Deal: {m.dealName || 'N/A'}</p>
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-sm text-primary">View All Properties</summary>
+                            <pre className="mt-2 text-xs overflow-auto bg-background p-2 rounded">
+                              {JSON.stringify(m.allProperties, null, 2)}
+                            </pre>
+                          </details>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
