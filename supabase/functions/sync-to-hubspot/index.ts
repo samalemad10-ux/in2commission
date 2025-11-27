@@ -18,18 +18,29 @@ serve(async (req) => {
       throw new Error('HubSpot token not configured');
     }
 
-    // Create or update commission_statement record in HubSpot
+    // Prepare commission data for HubSpot
     const recordData = {
       properties: {
-        deals_commission: commissionResult.totalCommission,
-        deals_rate_applied: commissionResult.usedBracketPercent || 0,
-        deals_total_amount: commissionResult.totalRevenue,
+        deals_commission: commissionResult.totalCommission.toString(),
+        deals_rate_applied: (commissionResult.usedBracketPercent || 0).toString(),
+        deals_total_amount: commissionResult.totalRevenue.toString(),
         channel: commissionResult.team,
-        total_meetings: commissionResult.totalMeetings,
+        total_meetings: commissionResult.totalMeetings.toString(),
+        period_start: commissionResult.periodStart,
+        period_end: commissionResult.periodEnd,
+        rep_name: commissionResult.repName,
+        rep_id: commissionResult.repId,
+        deal_commission: commissionResult.dealCommission.toString(),
+        meeting_bonus: commissionResult.meetingBonus.toString(),
       },
     };
 
-    const response = await fetch('https://api.hubapi.com/crm/v3/objects/commission_statement', {
+    console.log('Syncing to HubSpot:', recordData);
+
+    // Use custom object API with proper format
+    // Note: You need to create a custom object named "commission_statements" in HubSpot first
+    // Or replace this with the actual custom object ID from your HubSpot account
+    const response = await fetch('https://api.hubapi.com/crm/v3/objects/2-XXXXXXX', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${hubspotToken}`,
