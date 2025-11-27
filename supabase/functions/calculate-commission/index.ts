@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { startOfWeek, format } from "https://esm.sh/date-fns@3.6.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -377,8 +378,10 @@ serve(async (req) => {
             
             meetings.push({
               timestamp: meetingDate.toISOString(),
-              type: meeting.properties.hs_activity_type,
-              outcome: meeting.properties.hs_meeting_outcome,
+              activity: {
+                type: meeting.properties.hs_activity_type,
+              },
+              status: meeting.properties.hs_meeting_outcome,
             });
           }
         }
@@ -517,50 +520,62 @@ function calculateCommission(
       }
     });
   } else if (isSDR || (isMarketing && settings.marketing_same_as_sdr)) {
-    const periodStartDate = new Date(startDate);
-    const periodStartWeek = getISOWeek(periodStartDate);
-    
-    const weeklyMeetings: Record<number, any[]> = {};
-    meetings.forEach(meeting => {
-      const date = new Date(meeting.timestamp);
-      const isoWeek = getISOWeek(date);
-      // Calculate relative week number (1-indexed)
-      const relativeWeek = isoWeek - periodStartWeek + 1;
-      if (!weeklyMeetings[relativeWeek]) weeklyMeetings[relativeWeek] = [];
-      weeklyMeetings[relativeWeek].push(meeting);
+    // Filter meetings first - only completed discovery meetings
+    const filteredMeetings = meetings.filter(m => {
+      const isCompleted = m.status?.toLowerCase() === "completed";
+      const isDiscovery =
+        m.activity?.type?.toLowerCase().includes("sales discovery") ||
+        m.activity?.type?.toLowerCase().includes("discovery");
+      return isCompleted && isDiscovery;
     });
 
+    console.log(`Filtered meetings for ${repName}: ${filteredMeetings.length} out of ${meetings.length}`);
+
+    // Group meetings by real week start (Monday)
+    const weeklyMeetings: Record<string, any[]> = {};
+
+    filteredMeetings.forEach(meeting => {
+      const date = new Date(meeting.timestamp);
+      const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+
+      if (!weeklyMeetings[weekKey]) {
+        weeklyMeetings[weekKey] = [];
+      }
+      weeklyMeetings[weekKey].push(meeting);
+    });
+
+    // Calculate weekly bonuses
     console.log('SDR Meeting Tiers:', JSON.stringify(settings.sdr_meeting_tiers));
     
-    Object.entries(weeklyMeetings).forEach(([week, weekMeetings]) => {
+    Object.entries(weeklyMeetings).forEach(([weekKey, weekMeetings]) => {
       const meetingCount = weekMeetings.length;
-      console.log(`Week ${week}: ${meetingCount} meetings`);
-      
-      const tier = settings.sdr_meeting_tiers.find((t: any) => 
-        meetingCount >= t.min && (t.max === null || meetingCount < t.max)
+      console.log(`Week ${weekKey}: ${meetingCount} meetings`);
+
+      const tier = settings.sdr_meeting_tiers.find((t: any) =>
+        meetingCount >= t.min && (t.max === null || meetingCount <= t.max)
       );
-      
-      console.log(`Found tier for week ${week}:`, tier ? JSON.stringify(tier) : 'NO TIER FOUND');
-      
+      console.log(`Found tier for week ${weekKey}:`, tier ? JSON.stringify(tier) : 'NO TIER FOUND');
+
+      let weekBonus = 0;
       if (tier) {
-        const weekBonus = meetingCount * tier.bonus_amount;
-        console.log(`Week ${week} bonus calculation: ${meetingCount} × ${tier.bonus_amount} = ${weekBonus}`);
+        weekBonus = meetingCount * tier.bonus_amount;
+        console.log(`Week ${weekKey} bonus calculation: ${meetingCount} × ${tier.bonus_amount} = ${weekBonus}`);
         meetingBonus += weekBonus;
-        
-        // Calculate month name for the week
-        const periodStartDate = new Date(startDate);
-        const weekStartDate = new Date(periodStartDate);
-        weekStartDate.setDate(periodStartDate.getDate() + (parseInt(week) - 1) * 7);
-        const monthName = weekStartDate.toLocaleString('en-US', { month: 'long' });
-        const weekLabel = `${monthName} Week ${week}`;
-        
-        weeklyBreakdown.push({ 
-          week: parseInt(week), 
-          weekLabel,
-          meetings: meetingCount, 
-          bonus: weekBonus 
-        });
       }
+
+      // Month & week label logic
+      const weekStartDate = new Date(weekKey);
+      const monthName = format(weekStartDate, "MMMM");
+      const weekNumber = Math.floor((weekStartDate.getDate() - 1) / 7) + 1;
+      const weekLabel = `${monthName} Week ${weekNumber}`;
+
+      weeklyBreakdown.push({
+        week: weekNumber,
+        weekLabel,
+        meetings: meetingCount,
+        bonus: weekBonus
+      });
     });
     
     console.log('Total meeting bonus:', meetingBonus);
@@ -595,7 +610,13 @@ function calculateCommission(
     totalCommission: dealCommission + meetingBonus,
     dealCommission,
     meetingBonus,
-    totalMeetings: meetings.length,
+    totalMeetings: meetings.filter(m => {
+      const isCompleted = m.status?.toLowerCase() === "completed";
+      const isDiscovery =
+        m.activity?.type?.toLowerCase().includes("sales discovery") ||
+        m.activity?.type?.toLowerCase().includes("discovery");
+      return isCompleted && isDiscovery;
+    }).length,
     weeklyBreakdown,
   };
 }
