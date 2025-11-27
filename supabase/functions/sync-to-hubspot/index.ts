@@ -37,10 +37,8 @@ serve(async (req) => {
 
     console.log('Syncing to HubSpot:', recordData);
 
-    // Use custom object API with proper format
-    // Note: You need to create a custom object named "commission_statements" in HubSpot first
-    // Or replace this with the actual custom object ID from your HubSpot account
-    const response = await fetch('https://api.hubapi.com/crm/v3/objects/2-XXXXXXX', {
+    // Sync to HubSpot custom object (Commission Statements)
+    const response = await fetch('https://api.hubapi.com/crm/v3/objects/2-49027397', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${hubspotToken}`,
