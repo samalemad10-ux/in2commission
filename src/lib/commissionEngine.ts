@@ -27,6 +27,15 @@ export interface Meeting {
     type?: string;
   };
   status?: string;
+  subject?: string;
+  title?: string;
+  meeting_name?: string;
+  engagement_status?: string;
+  dealname?: string;
+  deal_name?: string;
+  properties?: {
+    dealname?: string;
+  };
 }
 
 export interface CommissionResult {
@@ -43,6 +52,7 @@ export interface CommissionResult {
   weeklyBreakdown?: { week: number; weekLabel: string; meetings: number; bonus: number }[];
   usedBracketPercent?: number;
   usedPaymentTermBonuses?: { term: string; amount: number }[];
+  debugMeetings?: any[];
 }
 
 export function calculateCommission(
@@ -61,6 +71,7 @@ export function calculateCommission(
   let weeklyBreakdown: { week: number; weekLabel: string; meetings: number; bonus: number }[] = [];
   let usedBracketPercent: number | undefined;
   let usedPaymentTermBonuses: { term: string; amount: number }[] = [];
+  let debugMeetings: any[] = [];
 
   // Filter closed won deals
   const closedWonDeals = deals.filter(d => 
@@ -134,6 +145,16 @@ export function calculateCommission(
 
     // Count only valid meetings
     totalMeetings = filteredMeetings.length;
+
+    // Debug meetings data
+    debugMeetings = filteredMeetings.map(m => ({
+      timestamp: m.timestamp,
+      meetingName: m.subject || m.title || m.meeting_name || "(no name)",
+      activityType: m.activity?.type,
+      status: m.status || m.engagement_status,
+      dealName: m.dealname || m.deal_name || m.properties?.dealname,
+      allProperties: m
+    }));
 
     // Group meetings by real week start (Monday)
     const weeklyMeetings: Record<string, Meeting[]> = {};
@@ -217,6 +238,7 @@ export function calculateCommission(
     totalMeetings,
     weeklyBreakdown,
     usedBracketPercent,
-    usedPaymentTermBonuses
+    usedPaymentTermBonuses,
+    debugMeetings: team === 'SDR' || team === 'Marketing' ? debugMeetings : undefined
   };
 }
