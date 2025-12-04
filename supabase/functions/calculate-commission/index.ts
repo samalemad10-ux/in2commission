@@ -320,8 +320,11 @@ serve(async (req) => {
 
         console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
 
-        // DEBUG: Build detailed meeting info with associations
-        for (const m of qualifiedMeetings) {
+        // DEBUG: Build detailed meeting info with associations (limit to first 15 for speed)
+        const meetingsToDebug = qualifiedMeetings.slice(0, 15);
+        console.log(`Building debug info for ${meetingsToDebug.length} meetings (out of ${qualifiedMeetings.length})`);
+        
+        for (const m of meetingsToDebug) {
           const meetingId = m.id;
           
           // Fetch associated deals
