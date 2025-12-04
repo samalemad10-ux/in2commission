@@ -272,7 +272,7 @@ export default function RunCommissions() {
 
                 {results.debugMeetings && results.debugMeetings.length > 0 && (
                   <div style={{ marginTop: "24px" }}>
-                    <h3>Meetings Used in Calculation</h3>
+                    <h3>Meetings Used in Calculation ({results.debugMeetings.length})</h3>
 
                     {results.debugMeetings.map((m: any, i: number) => (
                       <div 
@@ -288,7 +288,9 @@ export default function RunCommissions() {
                         <p><strong>Timestamp:</strong> {m.timestamp}</p>
                         <p><strong>Activity Type:</strong> {m.activityType}</p>
                         <p><strong>Status:</strong> {m.status}</p>
-                        <p><strong>Deal:</strong> {m.dealName ?? "(none)"}</p>
+                        <p><strong>Created By:</strong> {m.createdBy || "(unknown)"}</p>
+                        <p><strong>Associated Deals:</strong> {m.associatedDeals?.length > 0 ? m.associatedDeals.join(", ") : "(none)"}</p>
+                        <p><strong>Associated Contacts:</strong> {m.associatedContacts?.length > 0 ? m.associatedContacts.join(", ") : "(none)"}</p>
 
                         <details style={{ marginTop: "10px" }}>
                           <summary>Show All Properties</summary>
