@@ -264,7 +264,7 @@ serve(async (req) => {
                     ],
                   },
                 ],
-                properties: ['hs_meeting_start_time', 'hs_activity_type', 'hs_meeting_outcome'],
+                properties: ['hs_meeting_start_time', 'hs_activity_type', 'hs_meeting_outcome', 'hs_meeting_title', 'hs_meeting_body', 'hs_created_by', 'hubspot_owner_id', 'hs_createdate', 'hs_internal_meeting_notes'],
                 limit: 200,
                 ...(after && { after }),
               }),
@@ -320,16 +320,86 @@ serve(async (req) => {
 
         console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
 
-        // DEBUG: Log meetings Lovable is actually using
-        debugMeetings = qualifiedMeetings.map(m => ({
-          timestamp: new Date(m.properties.hs_meeting_start_time).toISOString(),
-          meetingName: m.properties.hs_meeting_title || m.properties.hs_meeting_body || "(no name)",
-          activityType: m.properties.hs_activity_type,
-          status: m.properties.hs_meeting_outcome,
-          allProperties: m.properties
-        }));
+        // DEBUG: Build detailed meeting info with associations
+        for (const m of qualifiedMeetings) {
+          const meetingId = m.id;
+          
+          // Fetch associated deals
+          let associatedDeals: string[] = [];
+          try {
+            const dealsResp = await fetch(
+              `https://api.hubapi.com/crm/v4/objects/meetings/${meetingId}/associations/deals`,
+              { headers: { Authorization: `Bearer ${hubspotToken}` } }
+            );
+            if (dealsResp.ok) {
+              const dealsData = await dealsResp.json();
+              const dealIds = dealsData.results?.map((r: any) => r.toObjectId) || [];
+              for (const dealId of dealIds) {
+                const dealResp = await fetch(
+                  `https://api.hubapi.com/crm/v3/objects/deals/${dealId}?properties=dealname`,
+                  { headers: { Authorization: `Bearer ${hubspotToken}` } }
+                );
+                if (dealResp.ok) {
+                  const dealData = await dealResp.json();
+                  associatedDeals.push(dealData.properties.dealname || `Deal ${dealId}`);
+                }
+              }
+            }
+          } catch (e) { console.error('Error fetching deal associations:', e); }
+          
+          // Fetch associated contacts
+          let associatedContacts: string[] = [];
+          try {
+            const contactsResp = await fetch(
+              `https://api.hubapi.com/crm/v4/objects/meetings/${meetingId}/associations/contacts`,
+              { headers: { Authorization: `Bearer ${hubspotToken}` } }
+            );
+            if (contactsResp.ok) {
+              const contactsData = await contactsResp.json();
+              const contactIds = contactsData.results?.map((r: any) => r.toObjectId) || [];
+              for (const contactId of contactIds) {
+                const contactResp = await fetch(
+                  `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email`,
+                  { headers: { Authorization: `Bearer ${hubspotToken}` } }
+                );
+                if (contactResp.ok) {
+                  const contactData = await contactResp.json();
+                  const name = `${contactData.properties.firstname || ''} ${contactData.properties.lastname || ''}`.trim();
+                  associatedContacts.push(name || contactData.properties.email || `Contact ${contactId}`);
+                }
+              }
+            }
+          } catch (e) { console.error('Error fetching contact associations:', e); }
+          
+          // Get owner name if hubspot_owner_id exists
+          let createdByName = m.properties.hs_created_by || '';
+          if (m.properties.hubspot_owner_id) {
+            try {
+              const ownerResp = await fetch(
+                `https://api.hubapi.com/crm/v3/owners/${m.properties.hubspot_owner_id}`,
+                { headers: { Authorization: `Bearer ${hubspotToken}` } }
+              );
+              if (ownerResp.ok) {
+                const ownerData = await ownerResp.json();
+                createdByName = `${ownerData.firstName || ''} ${ownerData.lastName || ''}`.trim() || ownerData.email || createdByName;
+              }
+            } catch (e) {}
+          }
+          
+          debugMeetings.push({
+            meetingId,
+            timestamp: new Date(m.properties.hs_meeting_start_time).toISOString(),
+            meetingName: m.properties.hs_meeting_title || m.properties.hs_meeting_body || "(no name)",
+            activityType: m.properties.hs_activity_type,
+            status: m.properties.hs_meeting_outcome,
+            createdBy: createdByName,
+            associatedDeals,
+            associatedContacts,
+            allProperties: m.properties
+          });
+        }
         
-        console.log("DEBUG — Meetings used for commission:", JSON.stringify(debugMeetings, null, 2));
+        console.log("DEBUG — Meetings used for commission:", JSON.stringify(debugMeetings.slice(0, 3), null, 2));
 
         // Step 2: For each meeting, get associated deals and check sdr_owner
         for (const meeting of qualifiedMeetings) {
