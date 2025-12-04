@@ -211,6 +211,7 @@ serve(async (req) => {
 
     // Fetch meetings from HubSpot (for SDR and Marketing teams)
     let meetings: any[] = [];
+    let debugMeetings: any[] = [];
     
     if (isSDR || isMarketing) {
       console.log(`Fetching meetings for ${repName} (${team})...`);
@@ -320,7 +321,7 @@ serve(async (req) => {
         console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
 
         // DEBUG: Log meetings Lovable is actually using
-        const debugMeetings = qualifiedMeetings.map(m => ({
+        debugMeetings = qualifiedMeetings.map(m => ({
           timestamp: new Date(m.properties.hs_meeting_start_time).toISOString(),
           meetingName: m.properties.hs_meeting_title || m.properties.hs_meeting_body || "(no name)",
           activityType: m.properties.hs_activity_type,
@@ -447,7 +448,7 @@ serve(async (req) => {
       }),
     });
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({ ...result, debugMeetings }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
