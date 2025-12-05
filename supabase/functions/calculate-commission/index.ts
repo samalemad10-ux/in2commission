@@ -97,6 +97,7 @@ serve(async (req) => {
           'amount',
           'closedate',
           'dealstage',
+          'dealname',
           'hubspot_owner_id',
           'channel',
           'deal_channel',
@@ -138,6 +139,7 @@ serve(async (req) => {
 
       return {
         id: d.id,
+        dealname: p.dealname || `Deal ${d.id}`,
         amount: parseFloat(p.amount) || 0,
         closedate: p.closedate,
         dealstage: p.dealstage,
@@ -209,12 +211,12 @@ serve(async (req) => {
     
     console.log(`Final: Team=${team}, RepID=${repId}, Deals=${deals.length}`);
     
-    // DEBUG: Build deals debug info (first 20)
-    const debugDeals = deals.slice(0, 20).map((d: any) => ({
-      dealId: d.id,
+    // DEBUG: Build deals debug info (first 20 closed won deals only)
+    const closedWonDeals = deals.filter((d: any) => d.dealstage === 'closedwon');
+    const debugDeals = closedWonDeals.slice(0, 20).map((d: any) => ({
+      dealName: d.dealname,
       amount: d.amount,
       closedate: d.closedate,
-      dealstage: d.dealstage,
       sdr_owner: d.sdr_owner,
       channel: d.channel,
       payment_terms: d.payment_terms,
