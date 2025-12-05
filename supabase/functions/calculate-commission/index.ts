@@ -167,6 +167,12 @@ serve(async (req) => {
     const normalizedFullName = ownerFullName?.toString().trim().toLowerCase() || '';
     
     // Step 3: Classify each deal using attribution rules
+    // Debug: Log all unique sdr_owner values for closed won deals
+    const closedWonForDebug = allDeals.filter((d: any) => d.dealstage === 'closedwon');
+    const uniqueSdrOwners = [...new Set(closedWonForDebug.map((d: any) => d.sdr_owner || 'EMPTY'))];
+    console.log(`Unique sdr_owner values in closed won deals: ${JSON.stringify(uniqueSdrOwners)}`);
+    console.log(`Matching against - ID: "${normalizedRepId}", Email: "${normalizedEmail}", Name: "${normalizedFullName}"`);
+    
     allDeals.forEach((deal: any) => {
       const normalized = {
         ownerId: deal.hubspot_owner_id?.toString().trim().toLowerCase() || '',
@@ -174,13 +180,20 @@ serve(async (req) => {
         sdr: deal.sdr_sde?.toString().trim().toLowerCase() || '',
       };
       
-      // SDR attribution
+      // SDR attribution - check both exact match and contains
       if (deal.sdr_owner) {
         const sdr = deal.sdr_owner.toLowerCase();
         const matchesId = normalizedRepId && (sdr === normalizedRepId || sdr.includes(normalizedRepId));
         const matchesEmail = normalizedEmail && (sdr === normalizedEmail || sdr.includes(normalizedEmail));
         const matchesName = normalizedFullName && (sdr === normalizedFullName || sdr.includes(normalizedFullName));
-        if (matchesId || matchesEmail || matchesName) {
+        // Also check if the name contains the sdr_owner (reverse check)
+        const reverseNameMatch = normalizedFullName && (normalizedFullName.includes(sdr) || sdr.includes(normalizedFullName.split(' ')[0]));
+        
+        if (deal.dealstage === 'closedwon') {
+          console.log(`Deal "${deal.dealname}" sdr_owner="${sdr}" vs rep="${normalizedFullName}" - matches: id=${matchesId}, email=${matchesEmail}, name=${matchesName}, reverse=${reverseNameMatch}`);
+        }
+        
+        if (matchesId || matchesEmail || matchesName || reverseNameMatch) {
           deal.assignedTo.push("SDR");
         }
       }
