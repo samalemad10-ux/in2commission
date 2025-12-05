@@ -270,6 +270,32 @@ export default function RunCommissions() {
                   </div>
                 )}
 
+                {results.debugDeals && results.debugDeals.length > 0 && (
+                  <div style={{ marginTop: "24px" }}>
+                    <h3>Deals Used in Calculation ({results.debugDeals.length})</h3>
+
+                    {results.debugDeals.map((d: any, i: number) => (
+                      <div 
+                        key={i} 
+                        style={{ 
+                          border: "1px solid #ddd", 
+                          borderRadius: "6px",
+                          padding: "12px", 
+                          marginBottom: "12px"
+                        }}
+                      >
+                        <p><strong>Deal ID:</strong> {d.dealId}</p>
+                        <p><strong>Amount/MRR:</strong> ${d.amount?.toLocaleString() ?? 0}</p>
+                        <p><strong>Close Date:</strong> {d.closedate}</p>
+                        <p><strong>Deal Stage:</strong> {d.dealstage}</p>
+                        <p><strong>SDR Owner:</strong> {d.sdr_owner || "(none)"}</p>
+                        <p><strong>Channel:</strong> {d.channel || "(none)"}</p>
+                        <p><strong>Payment Terms:</strong> {d.payment_terms || "(none)"}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {results.debugMeetings && results.debugMeetings.length > 0 && (
                   <div style={{ marginTop: "24px" }}>
                     <h3>Meetings Used in Calculation ({results.debugMeetings.length})</h3>

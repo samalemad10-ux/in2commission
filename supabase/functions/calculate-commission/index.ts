@@ -208,6 +208,17 @@ serve(async (req) => {
     }
     
     console.log(`Final: Team=${team}, RepID=${repId}, Deals=${deals.length}`);
+    
+    // DEBUG: Build deals debug info (first 20)
+    const debugDeals = deals.slice(0, 20).map((d: any) => ({
+      dealId: d.id,
+      amount: d.amount,
+      closedate: d.closedate,
+      dealstage: d.dealstage,
+      sdr_owner: d.sdr_owner,
+      channel: d.channel,
+      payment_terms: d.payment_terms,
+    }));
 
     // Fetch meetings from HubSpot (for SDR and Marketing teams)
     let meetings: any[] = [];
@@ -320,89 +331,8 @@ serve(async (req) => {
 
         console.log(`Qualified meetings (sales discovery + completed): ${qualifiedMeetings.length}`);
 
-        // DEBUG: Build detailed meeting info with associations (limit to first 15 for speed)
-        const meetingsToDebug = qualifiedMeetings.slice(0, 15);
-        console.log(`Building debug info for ${meetingsToDebug.length} meetings (out of ${qualifiedMeetings.length})`);
-        
-        for (const m of meetingsToDebug) {
-          const meetingId = m.id;
-          
-          // Fetch associated deals
-          let associatedDeals: string[] = [];
-          try {
-            const dealsResp = await fetch(
-              `https://api.hubapi.com/crm/v4/objects/meetings/${meetingId}/associations/deals`,
-              { headers: { Authorization: `Bearer ${hubspotToken}` } }
-            );
-            if (dealsResp.ok) {
-              const dealsData = await dealsResp.json();
-              const dealIds = dealsData.results?.map((r: any) => r.toObjectId) || [];
-              for (const dealId of dealIds) {
-                const dealResp = await fetch(
-                  `https://api.hubapi.com/crm/v3/objects/deals/${dealId}?properties=dealname`,
-                  { headers: { Authorization: `Bearer ${hubspotToken}` } }
-                );
-                if (dealResp.ok) {
-                  const dealData = await dealResp.json();
-                  associatedDeals.push(dealData.properties.dealname || `Deal ${dealId}`);
-                }
-              }
-            }
-          } catch (e) { console.error('Error fetching deal associations:', e); }
-          
-          // Fetch associated contacts
-          let associatedContacts: string[] = [];
-          try {
-            const contactsResp = await fetch(
-              `https://api.hubapi.com/crm/v4/objects/meetings/${meetingId}/associations/contacts`,
-              { headers: { Authorization: `Bearer ${hubspotToken}` } }
-            );
-            if (contactsResp.ok) {
-              const contactsData = await contactsResp.json();
-              const contactIds = contactsData.results?.map((r: any) => r.toObjectId) || [];
-              for (const contactId of contactIds) {
-                const contactResp = await fetch(
-                  `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email`,
-                  { headers: { Authorization: `Bearer ${hubspotToken}` } }
-                );
-                if (contactResp.ok) {
-                  const contactData = await contactResp.json();
-                  const name = `${contactData.properties.firstname || ''} ${contactData.properties.lastname || ''}`.trim();
-                  associatedContacts.push(name || contactData.properties.email || `Contact ${contactId}`);
-                }
-              }
-            }
-          } catch (e) { console.error('Error fetching contact associations:', e); }
-          
-          // Get owner name if hubspot_owner_id exists
-          let createdByName = m.properties.hs_created_by || '';
-          if (m.properties.hubspot_owner_id) {
-            try {
-              const ownerResp = await fetch(
-                `https://api.hubapi.com/crm/v3/owners/${m.properties.hubspot_owner_id}`,
-                { headers: { Authorization: `Bearer ${hubspotToken}` } }
-              );
-              if (ownerResp.ok) {
-                const ownerData = await ownerResp.json();
-                createdByName = `${ownerData.firstName || ''} ${ownerData.lastName || ''}`.trim() || ownerData.email || createdByName;
-              }
-            } catch (e) {}
-          }
-          
-          debugMeetings.push({
-            meetingId,
-            timestamp: new Date(m.properties.hs_meeting_start_time).toISOString(),
-            meetingName: m.properties.hs_meeting_title || m.properties.hs_meeting_body || "(no name)",
-            activityType: m.properties.hs_activity_type,
-            status: m.properties.hs_meeting_outcome,
-            createdBy: createdByName,
-            associatedDeals,
-            associatedContacts,
-            allProperties: m.properties
-          });
-        }
-        
-        console.log("DEBUG — Meetings used for commission:", JSON.stringify(debugMeetings.slice(0, 3), null, 2));
+        // Track meetings attributed to THIS rep for debug
+        const attributedMeetings: any[] = [];
 
         // Step 2: For each meeting, get associated deals and check sdr_owner
         for (const meeting of qualifiedMeetings) {
@@ -468,9 +398,13 @@ serve(async (req) => {
               },
               status: meeting.properties.hs_meeting_outcome,
             });
+            
+            // Track for debug output
+            attributedMeetings.push(meeting);
           }
         }
 
+        console.log(`Filtered meetings for ${repName}: ${attributedMeetings.length} out of ${qualifiedMeetings.length}`);
         console.log(`Total meetings counted for ${repName}: ${meetings.length}`);
         
         // Log weekly distribution
@@ -480,6 +414,91 @@ serve(async (req) => {
           weekDistribution[weekNum] = (weekDistribution[weekNum] || 0) + 1;
         });
         console.log(`Weekly meeting distribution for ${repName}:`, JSON.stringify(weekDistribution));
+        
+        // DEBUG: Build detailed meeting info for THIS rep's attributed meetings (limit to 20)
+        const meetingsToDebug = attributedMeetings.slice(0, 20);
+        console.log(`Building debug info for ${meetingsToDebug.length} of ${attributedMeetings.length} attributed meetings`);
+        
+        for (const m of meetingsToDebug) {
+          const meetingId = m.id;
+          
+          // Fetch associated deals with MRR
+          let associatedDeals: string[] = [];
+          try {
+            const dealsResp = await fetch(
+              `https://api.hubapi.com/crm/v4/objects/meetings/${meetingId}/associations/deals`,
+              { headers: { Authorization: `Bearer ${hubspotToken}` } }
+            );
+            if (dealsResp.ok) {
+              const dealsData = await dealsResp.json();
+              const dealIds = dealsData.results?.map((r: any) => r.toObjectId) || [];
+              for (const dealId of dealIds) {
+                const dealResp = await fetch(
+                  `https://api.hubapi.com/crm/v3/objects/deals/${dealId}?properties=dealname,hs_mrr,amount`,
+                  { headers: { Authorization: `Bearer ${hubspotToken}` } }
+                );
+                if (dealResp.ok) {
+                  const dealData = await dealResp.json();
+                  const mrr = dealData.properties.hs_mrr || dealData.properties.amount || '0';
+                  associatedDeals.push(`${dealData.properties.dealname || `Deal ${dealId}`} (MRR: $${mrr})`);
+                }
+              }
+            }
+          } catch (e) { console.error('Error fetching deal associations:', e); }
+          
+          // Fetch associated contacts
+          let associatedContacts: string[] = [];
+          try {
+            const contactsResp = await fetch(
+              `https://api.hubapi.com/crm/v4/objects/meetings/${meetingId}/associations/contacts`,
+              { headers: { Authorization: `Bearer ${hubspotToken}` } }
+            );
+            if (contactsResp.ok) {
+              const contactsData = await contactsResp.json();
+              const contactIds = contactsData.results?.map((r: any) => r.toObjectId) || [];
+              for (const contactId of contactIds) {
+                const contactResp = await fetch(
+                  `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email`,
+                  { headers: { Authorization: `Bearer ${hubspotToken}` } }
+                );
+                if (contactResp.ok) {
+                  const contactData = await contactResp.json();
+                  const name = `${contactData.properties.firstname || ''} ${contactData.properties.lastname || ''}`.trim();
+                  associatedContacts.push(name || contactData.properties.email || `Contact ${contactId}`);
+                }
+              }
+            }
+          } catch (e) { console.error('Error fetching contact associations:', e); }
+          
+          // Get owner name
+          let createdByName = m.properties.hs_created_by || '';
+          if (m.properties.hubspot_owner_id) {
+            try {
+              const ownerResp = await fetch(
+                `https://api.hubapi.com/crm/v3/owners/${m.properties.hubspot_owner_id}`,
+                { headers: { Authorization: `Bearer ${hubspotToken}` } }
+              );
+              if (ownerResp.ok) {
+                const ownerData = await ownerResp.json();
+                createdByName = `${ownerData.firstName || ''} ${ownerData.lastName || ''}`.trim() || ownerData.email || createdByName;
+              }
+            } catch (e) {}
+          }
+          
+          debugMeetings.push({
+            meetingId,
+            timestamp: new Date(m.properties.hs_meeting_start_time).toISOString(),
+            meetingName: m.properties.hs_meeting_title || m.properties.hs_meeting_body || "(no name)",
+            activityType: m.properties.hs_activity_type,
+            status: m.properties.hs_meeting_outcome,
+            createdBy: createdByName,
+            associatedDeals,
+            associatedContacts,
+            allProperties: m.properties
+          });
+        }
+        
+        console.log(`DEBUG — ${repName}'s meetings:`, JSON.stringify(debugMeetings.slice(0, 3), null, 2));
       } catch (err) {
         console.error("Meeting attribution error:", err);
       }
@@ -521,7 +540,7 @@ serve(async (req) => {
       }),
     });
 
-    return new Response(JSON.stringify({ ...result, debugMeetings }), {
+    return new Response(JSON.stringify({ ...result, debugMeetings, debugDeals }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
