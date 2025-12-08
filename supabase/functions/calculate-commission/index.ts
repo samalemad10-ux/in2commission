@@ -169,9 +169,15 @@ serve(async (req) => {
     // Step 3: Classify each deal using attribution rules
     // Debug: Log all unique sdr_owner values for closed won deals
     const closedWonForDebug = allDeals.filter((d: any) => d.dealstage === 'closedwon');
-    const uniqueSdrOwners = [...new Set(closedWonForDebug.map((d: any) => d.sdr_owner || 'EMPTY'))];
-    console.log(`Unique sdr_owner values in closed won deals: ${JSON.stringify(uniqueSdrOwners)}`);
-    console.log(`Matching against - ID: "${normalizedRepId}", Email: "${normalizedEmail}", Name: "${normalizedFullName}"`);
+    console.log(`=== DEAL DEBUG START ===`);
+    console.log(`Total closed won deals: ${closedWonForDebug.length}`);
+    console.log(`Rep being matched - ID: "${normalizedRepId}", Email: "${normalizedEmail}", Name: "${normalizedFullName}"`);
+    
+    // Log each closed won deal's sdr_owner
+    closedWonForDebug.forEach((d: any, i: number) => {
+      console.log(`Closed Won Deal ${i+1}: "${d.dealname}" - sdr_owner: "${d.sdr_owner || 'EMPTY'}"`);
+    });
+    console.log(`=== DEAL DEBUG END ===`);
     
     allDeals.forEach((deal: any) => {
       const normalized = {
@@ -182,7 +188,7 @@ serve(async (req) => {
       
       // SDR attribution - check both exact match and contains
       if (deal.sdr_owner) {
-        const sdr = deal.sdr_owner.toLowerCase();
+        const sdr = deal.sdr_owner.toString().trim().toLowerCase();
         const matchesId = normalizedRepId && (sdr === normalizedRepId || sdr.includes(normalizedRepId));
         const matchesEmail = normalizedEmail && (sdr === normalizedEmail || sdr.includes(normalizedEmail));
         const matchesName = normalizedFullName && (sdr === normalizedFullName || sdr.includes(normalizedFullName));
@@ -190,7 +196,7 @@ serve(async (req) => {
         const reverseNameMatch = normalizedFullName && (normalizedFullName.includes(sdr) || sdr.includes(normalizedFullName.split(' ')[0]));
         
         if (deal.dealstage === 'closedwon') {
-          console.log(`Deal "${deal.dealname}" sdr_owner="${sdr}" vs rep="${normalizedFullName}" - matches: id=${matchesId}, email=${matchesEmail}, name=${matchesName}, reverse=${reverseNameMatch}`);
+          console.log(`MATCH CHECK: "${deal.dealname}" sdr="${sdr}" vs name="${normalizedFullName}" => id=${matchesId}, email=${matchesEmail}, name=${matchesName}, reverse=${reverseNameMatch}`);
         }
         
         if (matchesId || matchesEmail || matchesName || reverseNameMatch) {
