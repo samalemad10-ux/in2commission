@@ -230,15 +230,16 @@ serve(async (req) => {
     
     console.log(`Final: Team=${team}, RepID=${repId}, Deals=${deals.length}`);
     
-    // DEBUG: Build deals debug info (first 20 closed won deals only)
-    const closedWonDeals = deals.filter((d: any) => d.dealstage === 'closedwon');
-    const debugDeals = closedWonDeals.slice(0, 20).map((d: any) => ({
+    // DEBUG: Build deals debug info - show ALL closed won deals to debug attribution
+    const allClosedWonDeals = allDeals.filter((d: any) => d.dealstage === 'closedwon');
+    const debugDeals = allClosedWonDeals.slice(0, 30).map((d: any) => ({
       dealName: d.dealname,
       amount: d.amount,
       closedate: d.closedate,
-      sdr_owner: d.sdr_owner,
+      sdr_owner: d.sdr_owner || '(empty)',
       channel: d.channel,
-      payment_terms: d.payment_terms,
+      assignedToSDR: d.assignedTo.includes('SDR') ? 'YES' : 'NO',
+      matchedRep: normalizedFullName,
     }));
 
     // Fetch meetings from HubSpot (for SDR and Marketing teams)
