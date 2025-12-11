@@ -186,19 +186,29 @@ serve(async (req) => {
         sdr: deal.sdr_sde?.toString().trim().toLowerCase() || '',
       };
       
-      // SDR attribution - sdr_owner can be either a HubSpot owner ID (numeric) or a name/email
+      // SDR attribution - sdr_owner can be a name, email, or HubSpot owner ID
       if (deal.sdr_owner) {
         const sdrOwnerValue = deal.sdr_owner.toString().trim().toLowerCase();
         
-        // Primary check: sdr_owner is a HubSpot owner ID (numeric) - compare directly with repId
+        // Check 1: Exact match with repId (numeric HubSpot owner ID)
         const matchesRepId = normalizedRepId && sdrOwnerValue === normalizedRepId;
         
-        // Fallback checks: sdr_owner might be an email or name
+        // Check 2: Exact or partial match with email
         const matchesEmail = normalizedEmail && (sdrOwnerValue === normalizedEmail || sdrOwnerValue.includes(normalizedEmail));
-        const matchesName = normalizedFullName && (sdrOwnerValue === normalizedFullName || sdrOwnerValue.includes(normalizedFullName));
+        
+        // Check 3: Name matching (most common case - sdr_owner contains the person's name)
+        const matchesNameExact = normalizedFullName && sdrOwnerValue === normalizedFullName;
+        const matchesNameContains = normalizedFullName && sdrOwnerValue.includes(normalizedFullName);
+        // Also check if sdr_owner is contained within the full name (partial name match)
+        const nameContainsSdr = normalizedFullName && normalizedFullName.includes(sdrOwnerValue);
+        // Check first name match
+        const firstName = normalizedFullName.split(' ')[0] || '';
+        const matchesFirstName = firstName && firstName.length > 2 && (sdrOwnerValue.includes(firstName) || sdrOwnerValue === firstName);
+        
+        const matchesName = matchesNameExact || matchesNameContains || nameContainsSdr || matchesFirstName;
         
         if (deal.dealstage === 'closedwon') {
-          console.log(`MATCH CHECK: "${deal.dealname}" sdr_owner="${sdrOwnerValue}" vs repId="${normalizedRepId}" => matchesRepId=${matchesRepId}, email=${matchesEmail}, name=${matchesName}`);
+          console.log(`MATCH CHECK: "${deal.dealname}" sdr_owner="${sdrOwnerValue}" vs name="${normalizedFullName}", repId="${normalizedRepId}" => repId=${matchesRepId}, email=${matchesEmail}, nameExact=${matchesNameExact}, nameContains=${matchesNameContains}, nameContainsSdr=${nameContainsSdr}, firstName=${matchesFirstName}`);
         }
         
         if (matchesRepId || matchesEmail || matchesName) {
