@@ -601,12 +601,19 @@ function calculateCommission(
   let meetingBonus = 0;
   let weeklyBreakdown: any[] = [];
 
-  const closedWonDeals = deals.filter(d => 
-    d.dealstage?.toLowerCase().includes('closed') && 
-    d.dealstage?.toLowerCase().includes('won')
-  );
+  // Filter for closed won deals - dealstage can be "closedwon" (one word) or "closed won"
+  const closedWonDeals = deals.filter(d => {
+    const stage = d.dealstage?.toLowerCase() || '';
+    return stage === 'closedwon' || (stage.includes('closed') && stage.includes('won'));
+  });
 
-  totalRevenue = closedWonDeals.reduce((sum, deal) => sum + deal.amount, 0);
+  console.log(`calculateCommission: ${closedWonDeals.length} closed won deals from ${deals.length} total deals`);
+  closedWonDeals.forEach((d, i) => {
+    console.log(`Closed Won Deal ${i+1}: "${d.dealname}" amount=${d.amount} stage=${d.dealstage}`);
+  });
+
+  totalRevenue = closedWonDeals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
+  console.log(`Total revenue from closed won deals: ${totalRevenue}`);
 
   // Apply revenue multiplier based on team
   let adjustedRevenue = totalRevenue;
